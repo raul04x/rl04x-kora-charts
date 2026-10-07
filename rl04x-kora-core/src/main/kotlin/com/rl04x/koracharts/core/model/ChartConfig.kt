@@ -1,0 +1,34 @@
+package com.rl04x.koracharts.core.model
+
+/**
+ * Global configuration model for Kora Charts.
+ * Configures grid lines, axes, tooltips, animation duration, zoom/pan state, and theme style.
+ */
+public data class ChartConfig(
+    val style: KoraChartStyle      = KoraChartStyle.dark(),
+    val showGrid: Boolean          = true,
+    val showVerticalGrid: Boolean  = false,
+    val showAxes: Boolean          = true,
+    val showLegend: Boolean        = true,
+    val showTooltip: Boolean       = true,
+    val animationDuration: Long    = 600L,
+    val paddingDp: Float           = 16f,
+    val showAxisLabels: Boolean    = true,
+    val xAxisLabelRotation: Float  = 0f,
+    val xAxisLabelMaxLen: Int      = 12,
+    val xAxisFormatter: ((Float) -> String)? = null,
+    val yAxisFormatter: ((Float) -> String)? = null,
+    val selectedEntry: Entry?      = null,
+    val showHighlightLine: Boolean = true,
+    val showHighlightLineX: Boolean = true,
+    val showHighlightLineY: Boolean = true,
+    val showPointValues: Boolean   = false,
+    val pointValueFormatter: ((Entry) -> String)? = null,
+    val centerTitle: String?       = null,
+    val centerSubtitle: String?    = null,
+    val zoomScaleX: Float          = 1f,
+    val panOffsetX: Float          = 0f,
+    val zoomScaleY: Float          = 1f,
+    val panOffsetY: Float          = 0f,
+    val enableZoom: Boolean        = false,
+)

@@ -1,0 +1,264 @@
+package com.rl04x.koracharts.core.renderer
+
+import android.content.res.Resources
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.RectF
+import androidx.core.graphics.toColorInt
+import com.rl04x.koracharts.core.model.ChartConfig
+import com.rl04x.koracharts.core.model.Dataset
+import java.util.Locale
+import kotlin.math.cos
+import kotlin.math.sin
+
+/**
+ * Renderer for Pie and Donut charts with glassmorphic tooltip badges.
+ */
+public class PieRenderer(
+    private val holeRadiusRatio: Float = 0.55f,
+) : BaseRenderer<Dataset> {
+
+    private val slicePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+
+    private val holePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        style = Paint.Style.FILL
+    }
+
+    private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textSize = 12f
+        textAlign = Paint.Align.CENTER
+    }
+
+    private val centerTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = "#222222".toColorInt()
+        textSize = 20f
+        textAlign = Paint.Align.CENTER
+    }
+
+    private val centerSubtitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = "#666666".toColorInt()
+        textSize = 13f
+        textAlign = Paint.Align.CENTER
+    }
+
+    // Glassmorphism tooltip brushes
+    private val glassBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+
+    private val glassBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+    }
+
+    private val glassShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+
+    private val badgeTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textSize = 11f
+        textAlign = Paint.Align.CENTER
+    }
+
+    private val textBoundsRect = Rect()
+
+    override fun draw(
+        canvas: Canvas,
+        width: Float,
+        height: Float,
+        data: List<Dataset>,
+        config: ChartConfig,
+        progress: Float,
+    ) {
+        if (data.isEmpty() || (width <= 0f) || (height <= 0f)) return
+
+        holePaint.color = config.style.cardBackgroundColor
+        centerTitlePaint.color = config.style.titleTextColor
+        centerSubtitlePaint.color = config.style.subtitleTextColor
+        badgeTextPaint.color = config.style.tooltipTextColor
+
+        val density = Resources.getSystem().displayMetrics.density
+        labelPaint.textSize = 12f * density
+        centerTitlePaint.textSize = 20f * density
+        centerSubtitlePaint.textSize = 13f * density
+        badgeTextPaint.textSize = 11f * density
+
+        val padding = config.paddingDp * density
+        val outerMargin = 12f * density
+
+        val availableSize = minOf(width, height) - (padding * 2f) - (outerMargin * 2f)
+        val size = maxOf(availableSize, 40f * density)
+
+        val radius = size / 2f
+        val centerX = width / 2f
+        val centerY = height / 2f
+
+        val oval = RectF(
+            centerX - radius,
+            centerY - radius,
+            centerX + radius,
+            centerY + radius,
+        )
+
+        val entries = data.firstOrNull()?.entries ?: return
+        val total = entries.sumOf { it.y.toDouble() }.toFloat()
+        if (total <= 0f) return
+
+        val sliceColors = listOf(
+            "#14B8A6".toColorInt(), // Teal
+            "#F87171".toColorInt(), // Coral
+            "#F59E0B".toColorInt(), // Amber/Yellow
+            "#8B5CF6".toColorInt(), // Purple
+            "#2DD4BF".toColorInt(), // Cyan
+            "#3B82F6".toColorInt(), // Blue
+        )
+
+        var startAngle = -90f
+        var pendingSelectedBadge: Runnable? = null
+
+        for ((idx, entry) in entries.withIndex()) {
+            val sweepAngle = (entry.y / total) * 360f * progress
+            val isSelected = (config.selectedEntry == entry)
+            val midAngleRad = Math.toRadians((startAngle + sweepAngle / 2f).toDouble())
+
+            if (isSelected) {
+                val explosionDist = 14f * density
+                val shiftX = (explosionDist * cos(midAngleRad)).toFloat()
+                val shiftY = (explosionDist * sin(midAngleRad)).toFloat()
+
+                val shiftedOval = RectF(
+                    oval.left + shiftX,
+                    oval.top + shiftY,
+                    oval.right + shiftX,
+                    oval.bottom + shiftY,
+                )
+
+                slicePaint.color = sliceColors[idx % sliceColors.size]
+                canvas.drawArc(shiftedOval, startAngle, sweepAngle, true, slicePaint)
+
+                // Prepare glassmorphic badge overlay
+                val badgeRadius = radius + 20f * density
+                val bx = (centerX + shiftX + badgeRadius * cos(midAngleRad)).toFloat()
+                val by = (centerY + shiftY + badgeRadius * sin(midAngleRad)).toFloat()
+                val pct = (entry.y / total) * 100f
+                val badgeText = "${entry.label ?: "Item"}: ${String.format(Locale.US, "%.0f%%", pct)}"
+
+                pendingSelectedBadge = Runnable {
+                    badgeTextPaint.getTextBounds(badgeText, 0, badgeText.length, textBoundsRect)
+                    val textWidth = badgeTextPaint.measureText(badgeText)
+                    val textHeight = textBoundsRect.height().toFloat()
+
+                    val paddingX = 8f * density
+                    val paddingY = 5f * density
+
+                    val badgeWidth = textWidth + (paddingX * 2f)
+                    val badgeHeight = textHeight + (paddingY * 2f)
+
+                    val badgeRect = RectF(
+                        bx - (badgeWidth / 2f),
+                        by - (badgeHeight / 2f),
+                        bx + (badgeWidth / 2f),
+                        by + (badgeHeight / 2f),
+                    )
+
+                    // Screen border clamping
+                    val screenMargin = 6f * density
+                    if (badgeRect.left < screenMargin) badgeRect.offset(screenMargin - badgeRect.left, 0f)
+                    if (badgeRect.right > width - screenMargin) badgeRect.offset((width - screenMargin) - badgeRect.right, 0f)
+                    if (badgeRect.top < screenMargin) badgeRect.offset(0f, screenMargin - badgeRect.top)
+                    if (badgeRect.bottom > height - screenMargin) badgeRect.offset(0f, (height - screenMargin) - badgeRect.bottom)
+
+                    val shadowRect = RectF(badgeRect.left, badgeRect.top + 2f * density, badgeRect.right, badgeRect.bottom + 2f * density)
+                    glassShadowPaint.color = Color.argb((0.25f * 255 * progress).toInt().coerceIn(0, 255), 0, 0, 0)
+                    canvas.drawRoundRect(shadowRect, 7f * density, 7f * density, glassShadowPaint)
+
+                    glassBgPaint.color = config.style.tooltipBackgroundColor
+
+                    glassBorderPaint.strokeWidth = 1.2f * density
+                    glassBorderPaint.color = config.style.tooltipBorderColor
+
+                    canvas.drawRoundRect(badgeRect, 7f * density, 7f * density, glassBgPaint)
+                    canvas.drawRoundRect(badgeRect, 7f * density, 7f * density, glassBorderPaint)
+
+                    val textY = badgeRect.centerY() + (textHeight / 2f) - 1.5f * density
+                    canvas.drawText(badgeText, badgeRect.centerX(), textY, badgeTextPaint)
+                }
+            } else {
+                slicePaint.color = sliceColors[idx % sliceColors.size]
+                canvas.drawArc(oval, startAngle, sweepAngle, true, slicePaint)
+            }
+
+            if (config.showAxisLabels && sweepAngle > 15f && progress >= 0.8f && !isSelected) {
+                val labelRadius = if (holeRadiusRatio > 0f) radius * (1f + holeRadiusRatio) / 2f else radius * 0.65f
+                val lx = (centerX + labelRadius * cos(midAngleRad)).toFloat()
+                val ly = (centerY + labelRadius * sin(midAngleRad)).toFloat() + 4f * density
+                val pct = (entry.y / total) * 100f
+                val text = String.format(Locale.US, "%.0f%%", pct)
+                canvas.drawText(text, lx, ly, labelPaint)
+            }
+
+            startAngle += (entry.y / total) * 360f
+        }
+
+        if (holeRadiusRatio > 0f) {
+            val holeRadius = radius * holeRadiusRatio
+            canvas.drawCircle(centerX, centerY, holeRadius, holePaint)
+
+            // Safe text bounds strictly inside donut hole (80% of inner diameter)
+            val maxTextWidth = holeRadius * 1.6f
+
+            val selected = config.selectedEntry
+            val titleText = if (selected != null) {
+                selected.label ?: "Selected"
+            } else {
+                config.centerTitle ?: "Total"
+            }
+
+            val subtitleText = if (selected != null) {
+                val pct = (selected.y / total) * 100f
+                String.format(Locale.US, "%.1f (%.0f%%)", selected.y, pct)
+            } else {
+                config.centerSubtitle ?: String.format(Locale.US, "%.0f", total)
+            }
+
+            // Auto-scale title font size to stay inside donut hole
+            var titleSize = 16f * density
+            centerTitlePaint.textSize = titleSize
+            while (centerTitlePaint.measureText(titleText) > maxTextWidth && titleSize > 9f * density) {
+                titleSize -= 1f * density
+                centerTitlePaint.textSize = titleSize
+            }
+
+            var formattedTitle = titleText
+            if (centerTitlePaint.measureText(formattedTitle) > maxTextWidth) {
+                while (formattedTitle.length > 3 && centerTitlePaint.measureText("$formattedTitle...") > maxTextWidth) {
+                    formattedTitle = formattedTitle.dropLast(1)
+                }
+                formattedTitle = "$formattedTitle..."
+            }
+
+            // Auto-scale subtitle font size
+            var subtitleSize = 12f * density
+            centerSubtitlePaint.textSize = subtitleSize
+            while (centerSubtitlePaint.measureText(subtitleText) > maxTextWidth && subtitleSize > 8f * density) {
+                subtitleSize -= 1f * density
+                centerSubtitlePaint.textSize = subtitleSize
+            }
+
+            val titleY = centerY - 2f * density
+            val subtitleY = centerY + subtitleSize + 3f * density
+
+            canvas.drawText(formattedTitle, centerX, titleY, centerTitlePaint)
+            canvas.drawText(subtitleText, centerX, subtitleY, centerSubtitlePaint)
+        }
+
+        // Draw overlay badge on top of everything
+        pendingSelectedBadge?.run()
+    }
+}

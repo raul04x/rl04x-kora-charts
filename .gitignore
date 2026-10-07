@@ -1,0 +1,63 @@
+# Built application files & Android build artifacts
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+output-metadata.json
+
+# Generated build directories & caches
+build/
+*/build/
+.gradle/
+.kotlin/
+bin/
+gen/
+out/
+
+# Android Studio & IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+misc.xml
+deploymentTargetDropDown.xml
+render.experimental.xml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Visual Studio Code
+.vscode/
+
+# Local configuration & Keystore files (SDK paths, private keys)
+local.properties
+secrets.properties
+*.jks
+*.keystore
+*.pepk
+*.p12
+*.pem
+
+# Third-party Services & Credentials
+google-services.json
+GoogleService-Info.plist
+
+# Logs & Profiling
+*.log
+*.hprof
+
+# macOS OS files
+.DS_Store
+.AppleDouble
+.LSOverride
+.Trashes
+.Spotlight-V100
+
+# Windows OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDE Artifacts & Temporary Files
+.artifacts/

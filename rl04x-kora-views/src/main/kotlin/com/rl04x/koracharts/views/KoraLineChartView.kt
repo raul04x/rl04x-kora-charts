@@ -1,0 +1,105 @@
+package com.rl04x.koracharts.views
+
+import android.content.Context
+import android.graphics.Canvas
+import android.util.AttributeSet
+import android.view.MotionEvent
+import android.view.View
+import com.rl04x.koracharts.core.animation.LinearAnimator
+import com.rl04x.koracharts.core.engine.ChartEngine
+import com.rl04x.koracharts.core.model.ChartConfig
+import com.rl04x.koracharts.core.model.Dataset
+import com.rl04x.koracharts.core.renderer.LineRenderer
+
+/**
+ * Custom Android View for rendering Kora Line Charts in XML layouts.
+ */
+public class KoraLineChartView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0,
+) : View(context, attrs, defStyleAttr) {
+
+    private var datasets: List<Dataset> = emptyList()
+    private var config: ChartConfig = ChartConfig()
+    private val renderer = LineRenderer()
+    private val animator = LinearAnimator()
+    private var animProgress: Float = 1f
+    private var isCurvedXml: Boolean = false
+    private var gradientFillXml: Boolean = false
+
+    public var onPointSelectedListener: ((x: Float, y: Float) -> Unit)? = null
+
+    init {
+        if (attrs != null) {
+            val a = context.obtainStyledAttributes(attrs, R.styleable.KoraLineChartView, defStyleAttr, 0)
+            val showGrid = a.getBoolean(R.styleable.KoraLineChartView_kora_showGrid, true)
+            val showAxes = a.getBoolean(R.styleable.KoraLineChartView_kora_showAxes, true)
+            val showLegend = a.getBoolean(R.styleable.KoraLineChartView_kora_showLegend, true)
+            val showAxisLabels = a.getBoolean(R.styleable.KoraLineChartView_kora_showAxisLabels, true)
+            isCurvedXml = a.getBoolean(R.styleable.KoraLineChartView_kora_isCurved, false)
+            gradientFillXml = a.getBoolean(R.styleable.KoraLineChartView_kora_gradientFill, false)
+            val animDuration = a.getInt(R.styleable.KoraLineChartView_kora_animationDuration, 600)
+            a.recycle()
+
+            config = config.copy(
+                showGrid = showGrid,
+                showAxes = showAxes,
+                showLegend = showLegend,
+                showAxisLabels = showAxisLabels,
+                animationDuration = animDuration.toLong(),
+            )
+        }
+    }
+
+    public fun setData(
+        data: List<Dataset>,
+        newConfig: ChartConfig = this.config,
+    ) {
+        this.datasets = data.map { ds ->
+            ds.copy(
+                isCurved = if (isCurvedXml) true else ds.isCurved,
+                gradientFill = if (gradientFillXml) true else ds.gradientFill,
+            )
+        }
+        this.config = newConfig
+        startAnimation()
+    }
+
+    private fun startAnimation() {
+        animator.start(config.animationDuration) { progress ->
+            animProgress = progress
+            postInvalidate()
+        }
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        return true
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.action == MotionEvent.ACTION_DOWN || event.action == MotionEvent.ACTION_MOVE) {
+            if (datasets.isNotEmpty() && width > 0 && height > 0) {
+                val density = resources.displayMetrics.density
+                val padding = config.paddingDp * density
+                val engine = ChartEngine(width.toFloat(), height.toFloat(), padding)
+                val range = engine.computeRange(datasets)
+                val nearest = engine.nearestEntry(event.x, event.y, datasets, range)
+                if (nearest != null) {
+                    config = config.copy(selectedEntry = nearest)
+                    onPointSelectedListener?.invoke(nearest.x, nearest.y)
+                    performClick()
+                    invalidate()
+                    return true
+                }
+            }
+        }
+        return super.onTouchEvent(event)
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        renderer.draw(canvas, width.toFloat(), height.toFloat(), datasets, config, animProgress)
+    }
+}
