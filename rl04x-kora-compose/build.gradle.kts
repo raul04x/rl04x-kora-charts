@@ -36,14 +36,14 @@ dependencies {
 
 mavenPublishing {
     coordinates(
-        groupId    = "com.rl04x.koracharts",
+        groupId    = "io.github.raul04x",
         artifactId = "rl04x-kora-compose",
         version    = "0.1.0-alpha01"
     )
     pom {
         name.set("Kora Charts Compose")
         description.set("Jetpack Compose components for Kora Charts")
-        url.set("https://github.com/koracharts/kora-charts")
+        url.set("https://github.com/raul04x/rl04x-kora-charts")
         licenses {
             license {
                 name.set("Apache License 2.0")
