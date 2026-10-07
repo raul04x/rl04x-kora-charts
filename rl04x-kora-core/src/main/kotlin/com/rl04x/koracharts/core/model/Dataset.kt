@@ -19,4 +19,7 @@ public data class Dataset(
     val gradientFill: Boolean = false,
     val gradientStartColor: Int? = null,
     val gradientEndColor: Int? = null,
+    val useSecondaryAxis: Boolean = false,
+    val colors: List<Int>? = null,
+    val labelTextColor: Int? = null,
 )

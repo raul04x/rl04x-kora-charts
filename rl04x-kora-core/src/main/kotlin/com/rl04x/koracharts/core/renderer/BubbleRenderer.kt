@@ -47,8 +47,10 @@ public class BubbleRenderer : BaseRenderer<BubbleEntry> {
         labelPaint.color = config.style.labelTextColor
         labelPaint.textSize = 10f * density
 
-        val leftPadding = if (config.showAxisLabels) config.paddingDp * density + 24f * density else config.paddingDp * density
-        val bottomPadding = if (config.showAxisLabels) config.paddingDp * density + 20f * density else config.paddingDp * density
+        val leftPadding =
+            if (config.showAxisLabels) config.paddingDp * density + 24f * density else config.paddingDp * density
+        val bottomPadding =
+            if (config.showAxisLabels) config.paddingDp * density + 20f * density else config.paddingDp * density
         val topPadding = config.paddingDp * density + 16f * density
         val rightPadding = config.paddingDp * density
 
@@ -65,15 +67,56 @@ public class BubbleRenderer : BaseRenderer<BubbleEntry> {
         val maxY = data.maxOf { it.y }
         val rangeY = (maxY - minY).coerceAtLeast(1f)
 
+        val yTickResult = if (config.useNiceTicks) {
+            com.rl04x.koracharts.core.engine.AxisTickCalculator.computeNiceTicks(
+                min = minY,
+                max = maxY,
+                targetTicks = 4,
+                customStep = config.yAxisStep,
+                forceInteger = config.forceIntegerTicks,
+            )
+        } else null
+
+        val effectiveMinY = yTickResult?.niceMin ?: minY
+        val effectiveMaxY = yTickResult?.niceMax ?: maxY
+        val effectiveRangeY = (effectiveMaxY - effectiveMinY).coerceAtLeast(1f)
+
         // Draw horizontal grid lines
         if (config.showGrid) {
-            val steps = 4
-            for (i in 0..steps) {
-                val y = topPadding + (drawHeight * (i.toFloat() / steps))
-                canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
-                if (config.showAxisLabels) {
-                    val valY = maxY - (rangeY * (i.toFloat() / steps))
-                    canvas.drawText(String.format(Locale.US, "%.0f", valY), leftPadding - 6f * density, y + 4f * density, labelPaint.apply { textAlign = Paint.Align.RIGHT })
+            if (yTickResult != null) {
+                for (yVal in yTickResult.ticks) {
+                    val pct = (yVal - effectiveMinY) / effectiveRangeY
+                    val y = topPadding + (1f - pct) * drawHeight
+                    if (y in (topPadding - 1f)..(baselineY + 1f)) {
+                        canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
+                        if (config.showAxisLabels) {
+                            val labelText = config.yAxisFormatter?.invoke(yVal)
+                                ?: if (config.forceIntegerTicks) String.format(
+                                    Locale.US,
+                                    "%.0f",
+                                    yVal
+                                ) else String.format(Locale.US, "%.1f", yVal)
+                            canvas.drawText(
+                                labelText,
+                                leftPadding - 6f * density,
+                                y + 4f * density,
+                                labelPaint.apply { textAlign = Paint.Align.RIGHT })
+                        }
+                    }
+                }
+            } else {
+                val steps = 4
+                for (i in 0..steps) {
+                    val y = topPadding + (drawHeight * (i.toFloat() / steps))
+                    canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
+                    if (config.showAxisLabels) {
+                        val valY = maxY - (rangeY * (i.toFloat() / steps))
+                        canvas.drawText(
+                            String.format(Locale.US, "%.0f", valY),
+                            leftPadding - 6f * density,
+                            y + 4f * density,
+                            labelPaint.apply { textAlign = Paint.Align.RIGHT })
+                    }
                 }
             }
         }
@@ -81,11 +124,12 @@ public class BubbleRenderer : BaseRenderer<BubbleEntry> {
         // Draw translucent bubbles
         for (entry in data) {
             val cx = leftPadding + ((entry.x - minX) / rangeX) * drawWidth
-            val cy = baselineY - ((entry.y - minY) / rangeY) * drawHeight
+            val cy = baselineY - ((entry.y - effectiveMinY) / effectiveRangeY) * drawHeight
             val radius = entry.radiusDp * density * progress
 
             val baseColor = entry.color
-            val alphaColor = Color.argb(140, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor))
+            val alphaColor =
+                Color.argb(140, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor))
 
             bubbleFillPaint.color = alphaColor
             canvas.drawCircle(cx, cy, radius, bubbleFillPaint)

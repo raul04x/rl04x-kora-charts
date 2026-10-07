@@ -35,7 +35,7 @@ mavenPublishing {
     coordinates(
         groupId    = "io.github.raul04x",
         artifactId = "rl04x-kora-views",
-        version    = "0.1.0-alpha01"
+        version    = "0.1.0-alpha02"
     )
     pom {
         name.set("Kora Charts Views")

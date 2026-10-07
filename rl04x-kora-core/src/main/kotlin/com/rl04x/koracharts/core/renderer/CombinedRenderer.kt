@@ -53,8 +53,10 @@ public class CombinedRenderer : BaseRenderer<Dataset> {
         labelPaint.color = config.style.labelTextColor
         labelPaint.textSize = 10f * density
 
-        val leftPadding = if (config.showAxisLabels) config.paddingDp * density + 24f * density else config.paddingDp * density
-        val bottomPadding = if (config.showAxisLabels) config.paddingDp * density + 20f * density else config.paddingDp * density
+        val leftPadding =
+            if (config.showAxisLabels) config.paddingDp * density + 24f * density else config.paddingDp * density
+        val bottomPadding =
+            if (config.showAxisLabels) config.paddingDp * density + 20f * density else config.paddingDp * density
         val topPadding = config.paddingDp * density + 16f * density
         val rightPadding = config.paddingDp * density
 
@@ -74,15 +76,54 @@ public class CombinedRenderer : BaseRenderer<Dataset> {
             lineDataset.entries.maxOfOrNull { it.y } ?: 100f,
         ).coerceAtLeast(1f)
 
+        val yTickResult = if (config.useNiceTicks) {
+            com.rl04x.koracharts.core.engine.AxisTickCalculator.computeNiceTicks(
+                min = 0f,
+                max = maxVal,
+                targetTicks = 4,
+                customStep = config.yAxisStep,
+                forceInteger = config.forceIntegerTicks,
+            )
+        } else null
+
+        val effectiveMaxVal = yTickResult?.niceMax ?: maxVal
+
         // Draw horizontal grid lines
         if (config.showGrid) {
-            val steps = 4
-            for (i in 0..steps) {
-                val y = topPadding + (drawHeight * (i.toFloat() / steps))
-                canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
-                if (config.showAxisLabels) {
-                    val yVal = maxVal * (1f - (i.toFloat() / steps))
-                    canvas.drawText(String.format(Locale.US, "%.0f", yVal), leftPadding - 6f * density, y + 4f * density, labelPaint.apply { textAlign = Paint.Align.RIGHT })
+            if (yTickResult != null) {
+                for (yVal in yTickResult.ticks) {
+                    val pct = yVal / effectiveMaxVal
+                    val y = topPadding + (1f - pct) * drawHeight
+                    if (y in (topPadding - 1f)..(baselineY + 1f)) {
+                        canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
+                        if (config.showAxisLabels) {
+                            val labelText = config.yAxisFormatter?.invoke(yVal)
+                                ?: if (config.forceIntegerTicks) String.format(
+                                    Locale.US,
+                                    "%.0f",
+                                    yVal
+                                ) else String.format(Locale.US, "%.1f", yVal)
+                            canvas.drawText(
+                                labelText,
+                                leftPadding - 6f * density,
+                                y + 4f * density,
+                                labelPaint.apply { textAlign = Paint.Align.RIGHT })
+                        }
+                    }
+                }
+            } else {
+                val steps = 4
+                for (i in 0..steps) {
+                    val y = topPadding + (drawHeight * (i.toFloat() / steps))
+                    canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
+                    if (config.showAxisLabels) {
+                        val yVal = maxVal * (1f - (i.toFloat() / steps))
+                        canvas.drawText(
+                            String.format(Locale.US, "%.0f", yVal),
+                            leftPadding - 6f * density,
+                            y + 4f * density,
+                            labelPaint.apply { textAlign = Paint.Align.RIGHT })
+                    }
                 }
             }
         }
@@ -96,14 +137,26 @@ public class CombinedRenderer : BaseRenderer<Dataset> {
             val cx = leftPadding + (idx * slotWidth) + (slotWidth / 2f)
             val barLeft = cx - (barWidth / 2f)
             val barRight = cx + (barWidth / 2f)
-            val barHeight = (entry.y / maxVal) * drawHeight * progress
+            val barHeight = (entry.y / effectiveMaxVal) * drawHeight * progress
             val barTop = baselineY - barHeight
 
-            canvas.drawRoundRect(barLeft, barTop, barRight, baselineY, 6f * density, 6f * density, barPaint)
+            canvas.drawRoundRect(
+                barLeft,
+                barTop,
+                barRight,
+                baselineY,
+                6f * density,
+                6f * density,
+                barPaint
+            )
 
             if (config.showAxisLabels) {
                 val labelText = entry.label ?: String.format(Locale.US, "%.0f", entry.x)
-                canvas.drawText(labelText, cx, baselineY + 14f * density, labelPaint.apply { textAlign = Paint.Align.CENTER })
+                canvas.drawText(
+                    labelText,
+                    cx,
+                    baselineY + 14f * density,
+                    labelPaint.apply { textAlign = Paint.Align.CENTER })
             }
         }
 
@@ -117,7 +170,7 @@ public class CombinedRenderer : BaseRenderer<Dataset> {
 
         for ((idx, entry) in lineDataset.entries.withIndex()) {
             val cx = leftPadding + (idx * slotWidth) + (slotWidth / 2f)
-            val lineY = baselineY - ((entry.y / maxVal) * drawHeight * progress)
+            val lineY = baselineY - ((entry.y / effectiveMaxVal) * drawHeight * progress)
             linePoints.add(Pair(cx, lineY))
 
             if (idx == 0) linePath.moveTo(cx, lineY) else linePath.lineTo(cx, lineY)
@@ -128,7 +181,11 @@ public class CombinedRenderer : BaseRenderer<Dataset> {
         // Draw node dots
         for (pt in linePoints) {
             canvas.drawCircle(pt.first, pt.second, 5f * density, nodePaint)
-            canvas.drawCircle(pt.first, pt.second, 2.5f * density, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = config.style.cardBackgroundColor })
+            canvas.drawCircle(
+                pt.first,
+                pt.second,
+                2.5f * density,
+                Paint(Paint.ANTI_ALIAS_FLAG).apply { color = config.style.cardBackgroundColor })
         }
     }
 }

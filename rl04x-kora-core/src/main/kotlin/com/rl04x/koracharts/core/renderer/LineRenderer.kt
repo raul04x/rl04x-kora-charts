@@ -12,6 +12,7 @@ import android.graphics.RectF
 import android.graphics.Shader
 import androidx.core.graphics.toColorInt
 import androidx.core.graphics.withClip
+import androidx.core.graphics.withRotation
 import com.rl04x.koracharts.core.engine.ChartEngine
 import com.rl04x.koracharts.core.model.ChartConfig
 import com.rl04x.koracharts.core.model.Dataset
@@ -118,23 +119,55 @@ public class LineRenderer : BaseRenderer<Dataset> {
         labelPaint.textSize = 10f * density
         badgeTextPaint.textSize = 10f * density
 
-        val hasRotatedLabels = config.showAxisLabels && (config.xAxisLabelRotation != 0f || data.firstOrNull()?.entries?.any { (it.label?.length ?: 0) > 8 } == true)
+        val hasRotatedLabels =
+            config.showAxisLabels && (config.xAxisLabelRotation != 0f || data.firstOrNull()?.entries?.any {
+                (it.label?.length ?: 0) > 8
+            } == true)
+        val hasSecondaryY = config.showSecondaryYAxis || data.any { it.useSecondaryAxis }
+        val hasLegend = config.showLegend && data.any { it.label.isNotEmpty() }
 
-        val leftPadding = if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
+        val leftPadding =
+            if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
+        val rightPadding =
+            if (hasSecondaryY && config.showAxisLabels) config.paddingDp * density + 32f * density else config.paddingDp * density
         val bottomPadding = if (config.showAxisLabels) {
             config.paddingDp * density + (if (hasRotatedLabels) 60f * density else 20f * density)
         } else {
             config.paddingDp * density
         }
-        val topPadding = config.paddingDp * density + 16f * density
-        val rightPadding = config.paddingDp * density
+        val topPadding =
+            config.paddingDp * density + (if (hasLegend) 24f * density else 16f * density)
 
         val drawWidth = width - leftPadding - rightPadding
         val drawHeight = height - topPadding - bottomPadding
         if (drawWidth <= 0f || drawHeight <= 0f) return
 
+        fun formatYValue(value: Float, customFormatter: ((Float) -> String)?): String {
+            if (customFormatter != null) return customFormatter.invoke(value)
+            if (config.compactNumberFormatting) {
+                return com.rl04x.koracharts.core.util.NumberFormatterUtils.formatCompact(
+                    value,
+                    config.valuePrefix,
+                    config.valueSuffix
+                )
+            }
+            val numStr = if (config.forceIntegerTicks) String.format(
+                Locale.US,
+                "%.0f",
+                value
+            ) else String.format(Locale.US, "%.1f", value)
+            return "${config.valuePrefix}$numStr${config.valueSuffix}"
+        }
+
         val engine = ChartEngine(width, height, config.paddingDp * density)
         val range = engine.computeRange(data)
+
+        val visibleZoomX = maxOf(1f, config.zoomScaleX)
+        val visibleRangeX = if (visibleZoomX == 1f) range.rangeX else range.rangeX / visibleZoomX
+        val maxPanX = (range.rangeX - visibleRangeX).coerceAtLeast(0f)
+        val clampedPanX = config.panOffsetX.coerceIn(0f, maxPanX)
+        val visibleMinX = range.minX + clampedPanX
+        val visibleMaxX = visibleMinX + visibleRangeX
 
         val visibleZoomY = maxOf(1f, config.zoomScaleY)
         val visibleRangeY = if (visibleZoomY == 1f) range.rangeY else range.rangeY / visibleZoomY
@@ -143,26 +176,218 @@ public class LineRenderer : BaseRenderer<Dataset> {
         val visibleMinY = range.minY + clampedPanY
         val visibleMaxY = visibleMinY + visibleRangeY
 
+        val xTickResult = if (config.useNiceTicks) {
+            com.rl04x.koracharts.core.engine.AxisTickCalculator.computeNiceTicks(
+                min = visibleMinX,
+                max = visibleMaxX,
+                targetTicks = 4,
+                customStep = config.xAxisStep,
+                forceInteger = config.forceIntegerTicks,
+            )
+        } else null
+
+        val yTickResult = if (config.useNiceTicks) {
+            com.rl04x.koracharts.core.engine.AxisTickCalculator.computeNiceTicks(
+                min = visibleMinY,
+                max = visibleMaxY,
+                targetTicks = 4,
+                customStep = config.yAxisStep,
+                forceInteger = config.forceIntegerTicks,
+            )
+        } else null
+
+        val effectiveMinX = xTickResult?.niceMin ?: visibleMinX
+        val effectiveMaxX = xTickResult?.niceMax ?: visibleMaxX
+        val effectiveRangeX = (effectiveMaxX - effectiveMinX).coerceAtLeast(1f)
+
+        val effectiveMinY = yTickResult?.niceMin ?: visibleMinY
+        val effectiveMaxY = yTickResult?.niceMax ?: visibleMaxY
+        val effectiveRangeY = (effectiveMaxY - effectiveMinY).coerceAtLeast(1f)
+
         val baselineY = topPadding + drawHeight
+
+        // Draw Target Zones
+        for (zone in config.targetZones) {
+            val topPct = ((zone.maxY - effectiveMinY) / effectiveRangeY).coerceIn(0f, 1f)
+            val bottomPct = ((zone.minY - effectiveMinY) / effectiveRangeY).coerceIn(0f, 1f)
+            val zTop = topPadding + (1f - topPct) * drawHeight
+            val zBottom = topPadding + (1f - bottomPct) * drawHeight
+
+            val zonePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = zone.color
+                alpha = (zone.fillAlpha * 255).toInt().coerceIn(0, 255)
+                style = Paint.Style.FILL
+            }
+            canvas.drawRect(leftPadding, zTop, width - rightPadding, zBottom, zonePaint)
+
+            if (zone.label != null) {
+                val zoneTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = zone.color
+                    textSize = 9f * density
+                    textAlign = Paint.Align.LEFT
+                }
+                canvas.drawText(
+                    zone.label,
+                    leftPadding + 6f * density,
+                    zTop + 12f * density,
+                    zoneTextPaint
+                )
+            }
+        }
+
+        // Draw Reference / Threshold Lines
+        for (refLine in config.referenceLines) {
+            val pct = ((refLine.value - effectiveMinY) / effectiveRangeY).coerceIn(0f, 1f)
+            val refY = topPadding + (1f - pct) * drawHeight
+            if (refY in topPadding..baselineY) {
+                val refPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = refLine.color
+                    strokeWidth = refLine.strokeWidthDp * density
+                    style = Paint.Style.STROKE
+                    if (refLine.isDashed) {
+                        pathEffect = DashPathEffect(floatArrayOf(10f, 10f), 0f)
+                    }
+                }
+                canvas.drawLine(leftPadding, refY, width - rightPadding, refY, refPaint)
+
+                if (refLine.label != null) {
+                    val refTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = refLine.color
+                        textSize = 9f * density
+                        textAlign = Paint.Align.RIGHT
+                    }
+                    canvas.drawText(
+                        refLine.label,
+                        width - rightPadding - 6f * density,
+                        refY - 4f * density,
+                        refTextPaint
+                    )
+                }
+            }
+        }
+
+        // Draw Legend at the top if enabled and dataset labels exist
+        if (hasLegend) {
+            val legendTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = config.style.labelTextColor
+                textSize = 10f * density
+                textAlign = Paint.Align.LEFT
+            }
+            val legendDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.FILL
+            }
+
+            var currentX = leftPadding
+            val legendY = config.paddingDp * density + 11f * density
+
+            for (dataset in data) {
+                if (dataset.label.isEmpty() || !dataset.visible) continue
+
+                legendDotPaint.color = dataset.color
+                canvas.drawCircle(
+                    currentX + 4f * density,
+                    legendY - 3f * density,
+                    4f * density,
+                    legendDotPaint
+                )
+
+                canvas.drawText(dataset.label, currentX + 11f * density, legendY, legendTextPaint)
+
+                val labelWidth = legendTextPaint.measureText(dataset.label)
+                currentX += 11f * density + labelWidth + 16f * density
+                if (currentX > width - rightPadding) break
+            }
+        }
+
+        // Draw Average Line
+        if (config.showAverageLine) {
+            val allVisibleEntries = data.filter { it.visible }.flatMap { it.entries }
+            if (allVisibleEntries.isNotEmpty()) {
+                val avgY = allVisibleEntries.map { it.y }.average().toFloat()
+                val pct = ((avgY - effectiveMinY) / effectiveRangeY).coerceIn(0f, 1f)
+                val avgScreenY = topPadding + (1f - pct) * drawHeight
+                if (avgScreenY in topPadding..baselineY) {
+                    val avgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = config.averageLineColor ?: config.style.highlightLineColor
+                        strokeWidth = 1.5f * density
+                        style = Paint.Style.STROKE
+                        pathEffect = DashPathEffect(floatArrayOf(8f, 8f), 0f)
+                    }
+                    canvas.drawLine(
+                        leftPadding,
+                        avgScreenY,
+                        width - rightPadding,
+                        avgScreenY,
+                        avgPaint
+                    )
+
+                    val avgTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = config.averageLineColor ?: config.style.highlightLineColor
+                        textSize = 9f * density
+                        textAlign = Paint.Align.LEFT
+                    }
+                    val avgText = "Avg: ${formatYValue(avgY, config.yAxisFormatter)}"
+                    canvas.drawText(
+                        avgText,
+                        leftPadding + 6f * density,
+                        avgScreenY - 4f * density,
+                        avgTextPaint
+                    )
+                }
+            }
+        }
 
         // Draw grid
         if (config.showGrid) {
-            val gridSteps = 4
-            for (i in 0..gridSteps) {
-                val y = topPadding + (drawHeight * (i.toFloat() / gridSteps))
-                canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
+            if (yTickResult != null) {
+                for (yVal in yTickResult.ticks) {
+                    val pct = (yVal - effectiveMinY) / effectiveRangeY
+                    val y = topPadding + (1f - pct) * drawHeight
+                    if (y in (topPadding - 1f)..(baselineY + 1f)) {
+                        canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
+                        if (config.showAxisLabels) {
+                            val labelText = formatYValue(yVal, config.yAxisFormatter)
+                            canvas.drawText(
+                                labelText,
+                                leftPadding - 8f * density,
+                                y + 4f * density,
+                                labelPaint.apply { textAlign = Paint.Align.RIGHT })
+                        }
+                    }
+                }
+            } else {
+                val gridSteps = 4
+                for (i in 0..gridSteps) {
+                    val y = topPadding + (drawHeight * (i.toFloat() / gridSteps))
+                    canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
 
-                if (config.showAxisLabels) {
-                    val yVal = visibleMaxY - (visibleRangeY * (i.toFloat() / gridSteps))
-                    val labelText = config.yAxisFormatter?.invoke(yVal) ?: String.format(Locale.US, "%.1f", yVal)
-                    canvas.drawText(labelText, leftPadding - 8f * density, y + 4f * density, labelPaint.apply { textAlign = Paint.Align.RIGHT })
+                    if (config.showAxisLabels) {
+                        val yVal = visibleMaxY - (visibleRangeY * (i.toFloat() / gridSteps))
+                        val labelText = formatYValue(yVal, config.yAxisFormatter)
+                        canvas.drawText(
+                            labelText,
+                            leftPadding - 8f * density,
+                            y + 4f * density,
+                            labelPaint.apply { textAlign = Paint.Align.RIGHT })
+                    }
                 }
             }
 
             if (config.showVerticalGrid) {
-                for (i in 0..gridSteps) {
-                    val x = leftPadding + (drawWidth * (i.toFloat() / gridSteps))
-                    canvas.drawLine(x, topPadding, x, baselineY, gridPaint)
+                if (xTickResult != null) {
+                    for (xVal in xTickResult.ticks) {
+                        val pct = (xVal - effectiveMinX) / effectiveRangeX
+                        val x = leftPadding + pct * drawWidth
+                        if (x in (leftPadding - 1f)..(width - rightPadding + 1f)) {
+                            canvas.drawLine(x, topPadding, x, baselineY, gridPaint)
+                        }
+                    }
+                } else {
+                    val gridSteps = 4
+                    for (i in 0..gridSteps) {
+                        val x = leftPadding + (drawWidth * (i.toFloat() / gridSteps))
+                        canvas.drawLine(x, topPadding, x, baselineY, gridPaint)
+                    }
                 }
             }
         }
@@ -171,12 +396,99 @@ public class LineRenderer : BaseRenderer<Dataset> {
         if (config.showAxes) {
             canvas.drawLine(leftPadding, baselineY, width - rightPadding, baselineY, axisPaint)
             canvas.drawLine(leftPadding, topPadding, leftPadding, baselineY, axisPaint)
+
+            if (hasSecondaryY) {
+                canvas.drawLine(
+                    width - rightPadding,
+                    topPadding,
+                    width - rightPadding,
+                    baselineY,
+                    axisPaint
+                )
+
+                val secDatasets =
+                    data.filter { it.useSecondaryAxis && it.visible && it.entries.isNotEmpty() }
+                if (secDatasets.isNotEmpty()) {
+                    val secRange = engine.computeRange(secDatasets)
+                    val secYTickResult = if (config.useNiceTicks) {
+                        com.rl04x.koracharts.core.engine.AxisTickCalculator.computeNiceTicks(
+                            min = secRange.minY,
+                            max = secRange.maxY,
+                            targetTicks = 4,
+                            customStep = config.yAxisStep,
+                            forceInteger = config.forceIntegerTicks,
+                        )
+                    } else null
+
+                    val secMinY = secYTickResult?.niceMin ?: secRange.minY
+                    val secMaxY = secYTickResult?.niceMax ?: secRange.maxY
+                    val secRangeY = (secMaxY - secMinY).coerceAtLeast(1f)
+
+                    val secTicks =
+                        secYTickResult?.ticks ?: listOf(secMinY, secMinY + secRangeY / 2f, secMaxY)
+                    for (yVal in secTicks) {
+                        val pct = (yVal - secMinY) / secRangeY
+                        val y = topPadding + (1f - pct) * drawHeight
+                        if (y in (topPadding - 1f)..(baselineY + 1f)) {
+                            val labelText = formatYValue(yVal, config.secondaryYAxisFormatter)
+                            canvas.drawText(
+                                labelText,
+                                width - rightPadding + 6f * density,
+                                y + 4f * density,
+                                labelPaint.apply { textAlign = Paint.Align.LEFT })
+                        }
+                    }
+                }
+            }
         }
 
         val pendingBadges = mutableListOf<GlassBadgeItem>()
 
+        // Min / Max Badges
+        if (config.showMinMaxBadges) {
+            for (dataset in data) {
+                if (!dataset.visible || dataset.entries.isEmpty()) continue
+                val maxEntry = dataset.entries.maxByOrNull { it.y }
+                val minEntry = dataset.entries.minByOrNull { it.y }
+
+                if (maxEntry != null) {
+                    val sx =
+                        leftPadding + ((maxEntry.x - effectiveMinX) / effectiveRangeX * drawWidth)
+                    val sy =
+                        baselineY - ((baselineY - (topPadding + (1f - (maxEntry.y - effectiveMinY) / effectiveRangeY) * drawHeight)) * progress)
+                    pendingBadges.add(
+                        GlassBadgeItem(
+                            "▲ Max: ${formatYValue(maxEntry.y, null)}",
+                            sx,
+                            sy,
+                            true
+                        )
+                    )
+                }
+                if (minEntry != null && minEntry != maxEntry) {
+                    val sx =
+                        leftPadding + ((minEntry.x - effectiveMinX) / effectiveRangeX * drawWidth)
+                    val sy =
+                        baselineY - ((baselineY - (topPadding + (1f - (minEntry.y - effectiveMinY) / effectiveRangeY) * drawHeight)) * progress)
+                    pendingBadges.add(
+                        GlassBadgeItem(
+                            "▼ Min: ${formatYValue(minEntry.y, null)}",
+                            sx,
+                            sy,
+                            false
+                        )
+                    )
+                }
+            }
+        }
+
         // PASS 1: Plotting lines and node dots (clipped to chart area)
-        canvas.withClip(leftPadding, topPadding - 4f * density, width - rightPadding, baselineY + 2f * density) {
+        canvas.withClip(
+            leftPadding,
+            topPadding - 4f * density,
+            width - rightPadding,
+            baselineY + 2f * density
+        ) {
             for (dataset in data) {
                 if (!dataset.visible || dataset.entries.isEmpty()) continue
 
@@ -205,21 +517,16 @@ public class LineRenderer : BaseRenderer<Dataset> {
                 val fillPath = Path()
 
                 val points = dataset.entries.map { entry ->
-                    val sx = leftPadding + (if (range.rangeX == 0f) {
+                    val sx = leftPadding + (if (effectiveRangeX == 0f) {
                         drawWidth / 2f
                     } else {
-                        val visibleZoomX = maxOf(1f, config.zoomScaleX)
-                        val visibleRangeX = range.rangeX / visibleZoomX
-                        val maxPanX = (range.rangeX - visibleRangeX).coerceAtLeast(0f)
-                        val clampedPanX = config.panOffsetX.coerceIn(0f, maxPanX)
-                        val visibleMinX = range.minX + clampedPanX
-                        (entry.x - visibleMinX) / visibleRangeX * drawWidth
+                        (entry.x - effectiveMinX) / effectiveRangeX * drawWidth
                     })
 
-                    val targetY = topPadding + (if (visibleRangeY == 0f) {
+                    val targetY = topPadding + (if (effectiveRangeY == 0f) {
                         drawHeight / 2f
                     } else {
-                        (1f - (entry.y - visibleMinY) / visibleRangeY) * drawHeight
+                        (1f - (entry.y - effectiveMinY) / effectiveRangeY) * drawHeight
                     })
                     val sy = baselineY - ((baselineY - targetY) * progress)
                     Pair(sx, sy)
@@ -239,8 +546,22 @@ public class LineRenderer : BaseRenderer<Dataset> {
                         val controlX2 = p1.first + (p2.first - p1.first) / 2f
                         val controlY2 = p2.second
 
-                        path.cubicTo(controlX1, controlY1, controlX2, controlY2, p2.first, p2.second)
-                        fillPath.cubicTo(controlX1, controlY1, controlX2, controlY2, p2.first, p2.second)
+                        path.cubicTo(
+                            controlX1,
+                            controlY1,
+                            controlX2,
+                            controlY2,
+                            p2.first,
+                            p2.second
+                        )
+                        fillPath.cubicTo(
+                            controlX1,
+                            controlY1,
+                            controlX2,
+                            controlY2,
+                            p2.first,
+                            p2.second
+                        )
                     }
                 } else {
                     for (i in 1 until points.size) {
@@ -262,14 +583,23 @@ public class LineRenderer : BaseRenderer<Dataset> {
                     for ((idx, p) in points.withIndex()) {
                         val entry = dataset.entries[idx]
                         val isSelected = (config.selectedEntry == entry)
-                        val radius = if (isSelected) dataset.pointRadius * density * 1.8f else dataset.pointRadius * density
+                        val radius =
+                            if (isSelected) dataset.pointRadius * density * 1.8f else dataset.pointRadius * density
                         canvas.drawCircle(p.first, p.second, radius, pointPaint)
 
                         if ((config.showPointValues || isSelected) && progress >= 0.5f) {
                             val valueText = config.pointValueFormatter?.invoke(entry)
-                                ?: (entry.label?.let { "$it: ${entry.y}" } ?: String.format(Locale.US, "%.1f", entry.y))
+                                ?: (entry.label?.let { "$it: ${entry.y}" }
+                                    ?: String.format(Locale.US, "%.1f", entry.y))
 
-                            pendingBadges.add(GlassBadgeItem(valueText, p.first, p.second, isSelected))
+                            pendingBadges.add(
+                                GlassBadgeItem(
+                                    valueText,
+                                    p.first,
+                                    p.second,
+                                    isSelected
+                                )
+                            )
                         }
                     }
                 }
@@ -278,20 +608,15 @@ public class LineRenderer : BaseRenderer<Dataset> {
             // Draw highlight lines for selected point
             if (config.selectedEntry != null && config.showHighlightLine) {
                 val sel = config.selectedEntry
-                val sx = leftPadding + (if (range.rangeX == 0f) {
+                val sx = leftPadding + (if (effectiveRangeX == 0f) {
                     drawWidth / 2f
                 } else {
-                    val visibleZoomX = maxOf(1f, config.zoomScaleX)
-                    val visibleRangeX = range.rangeX / visibleZoomX
-                    val maxPanX = (range.rangeX - visibleRangeX).coerceAtLeast(0f)
-                    val clampedPanX = config.panOffsetX.coerceIn(0f, maxPanX)
-                    val visibleMinX = range.minX + clampedPanX
-                    (sel.x - visibleMinX) / visibleRangeX * drawWidth
+                    (sel.x - effectiveMinX) / effectiveRangeX * drawWidth
                 })
-                val targetY = topPadding + (if (visibleRangeY == 0f) {
+                val targetY = topPadding + (if (effectiveRangeY == 0f) {
                     drawHeight / 2f
                 } else {
-                    (1f - (sel.y - visibleMinY) / visibleRangeY) * drawHeight
+                    (1f - (sel.y - effectiveMinY) / effectiveRangeY) * drawHeight
                 })
                 val sy = baselineY - ((baselineY - targetY) * progress)
 
@@ -312,37 +637,94 @@ public class LineRenderer : BaseRenderer<Dataset> {
         if (config.showAxisLabels) {
             val firstDataset = data.firstOrNull { it.visible && it.entries.isNotEmpty() }
             if (firstDataset != null) {
-                for (entry in firstDataset.entries) {
-                    val sx = leftPadding + (if (range.rangeX == 0f) {
-                        drawWidth / 2f
-                    } else {
-                        val visibleZoomX = maxOf(1f, config.zoomScaleX)
-                        val visibleRangeX = range.rangeX / visibleZoomX
-                        val maxPanX = (range.rangeX - visibleRangeX).coerceAtLeast(0f)
-                        val clampedPanX = config.panOffsetX.coerceIn(0f, maxPanX)
-                        val visibleMinX = range.minX + clampedPanX
-                        (entry.x - visibleMinX) / visibleRangeX * drawWidth
-                    })
+                if (xTickResult != null) {
+                    for (xVal in xTickResult.ticks) {
+                        val pct = (xVal - effectiveMinX) / effectiveRangeX
+                        val sx = leftPadding + pct * drawWidth
 
-                    if (sx in leftPadding..width - rightPadding) {
-                        val rawText = config.xAxisFormatter?.invoke(entry.x) ?: entry.label ?: String.format(Locale.US, "%.0f", entry.x)
-                        val rotation = when {
-                            config.xAxisLabelRotation != 0f -> config.xAxisLabelRotation
-                            rawText.length > 8 -> -90f
-                            else -> 0f
+                        if (sx in (leftPadding - 1f)..(width - rightPadding + 1f)) {
+                            val matchedEntry =
+                                firstDataset.entries.firstOrNull { kotlin.math.abs(it.x - xVal) < 0.001f }
+                            val rawText = config.xAxisFormatter?.invoke(xVal)
+                                ?: matchedEntry?.label
+                                ?: if (config.forceIntegerTicks) String.format(
+                                    Locale.US,
+                                    "%.0f",
+                                    xVal
+                                ) else String.format(Locale.US, "%.1f", xVal)
+
+                            val rotation = when {
+                                config.xAxisLabelRotation != 0f -> config.xAxisLabelRotation
+                                rawText.length > 8 -> -90f
+                                else -> 0f
+                            }
+
+                            val labelY = baselineY + 10f * density
+
+                            if (rotation != 0f) {
+                                canvas.withRotation(rotation, sx, labelY) {
+                                    drawText(
+                                        rawText,
+                                        sx,
+                                        labelY,
+                                        labelPaint.apply { textAlign = Paint.Align.RIGHT })
+                                }
+                            } else {
+                                val labelText =
+                                    if (rawText.length > config.xAxisLabelMaxLen) rawText.take(
+                                        config.xAxisLabelMaxLen - 1
+                                    ) + "…" else rawText
+                                canvas.drawText(
+                                    labelText,
+                                    sx,
+                                    labelY,
+                                    labelPaint.apply { textAlign = Paint.Align.CENTER })
+                            }
                         }
-
-                        val labelX = sx
-                        val labelY = baselineY + 10f * density
-
-                        if (rotation != 0f) {
-                            canvas.save()
-                            canvas.rotate(rotation, labelX, labelY)
-                            canvas.drawText(rawText, labelX, labelY, labelPaint.apply { textAlign = Paint.Align.RIGHT })
-                            canvas.restore()
+                    }
+                } else {
+                    for (entry in firstDataset.entries) {
+                        val sx = leftPadding + (if (range.rangeX == 0f) {
+                            drawWidth / 2f
                         } else {
-                            val labelText = if (rawText.length > config.xAxisLabelMaxLen) rawText.take(config.xAxisLabelMaxLen - 1) + "…" else rawText
-                            canvas.drawText(labelText, labelX, labelY, labelPaint.apply { textAlign = Paint.Align.CENTER })
+                            val visibleZoomX = maxOf(1f, config.zoomScaleX)
+                            val visibleRangeX = range.rangeX / visibleZoomX
+                            val maxPanX = (range.rangeX - visibleRangeX).coerceAtLeast(0f)
+                            val clampedPanX = config.panOffsetX.coerceIn(0f, maxPanX)
+                            val visibleMinX = range.minX + clampedPanX
+                            (entry.x - visibleMinX) / visibleRangeX * drawWidth
+                        })
+
+                        if (sx in leftPadding..width - rightPadding) {
+                            val rawText = config.xAxisFormatter?.invoke(entry.x) ?: entry.label
+                            ?: String.format(Locale.US, "%.0f", entry.x)
+                            val rotation = when {
+                                config.xAxisLabelRotation != 0f -> config.xAxisLabelRotation
+                                rawText.length > 8 -> -90f
+                                else -> 0f
+                            }
+
+                            val labelY = baselineY + 10f * density
+
+                            if (rotation != 0f) {
+                                canvas.withRotation(rotation, sx, labelY) {
+                                    drawText(
+                                        rawText,
+                                        sx,
+                                        labelY,
+                                        labelPaint.apply { textAlign = Paint.Align.RIGHT })
+                                }
+                            } else {
+                                val labelText =
+                                    if (rawText.length > config.xAxisLabelMaxLen) rawText.take(
+                                        config.xAxisLabelMaxLen - 1
+                                    ) + "…" else rawText
+                                canvas.drawText(
+                                    labelText,
+                                    sx,
+                                    labelY,
+                                    labelPaint.apply { textAlign = Paint.Align.CENTER })
+                            }
                         }
                     }
                 }
@@ -371,8 +753,14 @@ public class LineRenderer : BaseRenderer<Dataset> {
                 cy + (badgeHeight / 2f),
             )
 
-            val shadowRect = RectF(badgeRect.left, badgeRect.top + 2f * density, badgeRect.right, badgeRect.bottom + 2f * density)
-            glassShadowPaint.color = Color.argb((0.25f * 255 * progress).toInt().coerceIn(0, 255), 0, 0, 0)
+            val shadowRect = RectF(
+                badgeRect.left,
+                badgeRect.top + 2f * density,
+                badgeRect.right,
+                badgeRect.bottom + 2f * density
+            )
+            glassShadowPaint.color =
+                Color.argb((0.25f * 255 * progress).toInt().coerceIn(0, 255), 0, 0, 0)
             canvas.drawRoundRect(shadowRect, 7f * density, 7f * density, glassShadowPaint)
 
             glassBgPaint.color = config.style.tooltipBackgroundColor

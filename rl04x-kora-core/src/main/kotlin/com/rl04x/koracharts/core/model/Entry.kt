@@ -12,4 +12,6 @@ public data class Entry(
     val x: Float,
     val y: Float,
     val label: String? = null,
+    val color: Int? = null,
+    val textColor: Int? = null,
 )

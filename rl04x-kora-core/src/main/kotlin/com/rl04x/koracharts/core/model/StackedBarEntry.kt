@@ -8,4 +8,5 @@ public data class StackedBarEntry(
     val values: List<Float>,
     val colors: List<Int>,
     val label: String? = null,
+    val textColors: List<Int>? = null,
 )

@@ -51,8 +51,10 @@ public class CandlestickRenderer : BaseRenderer<CandlestickEntry> {
         labelPaint.color = config.style.labelTextColor
         labelPaint.textSize = 10f * density
 
-        val leftPadding = if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
-        val bottomPadding = if (config.showAxisLabels) config.paddingDp * density + 20f * density else config.paddingDp * density
+        val leftPadding =
+            if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
+        val bottomPadding =
+            if (config.showAxisLabels) config.paddingDp * density + 20f * density else config.paddingDp * density
         val topPadding = config.paddingDp * density + 16f * density
         val rightPadding = config.paddingDp * density
 
@@ -65,15 +67,56 @@ public class CandlestickRenderer : BaseRenderer<CandlestickEntry> {
         val maxVal = data.maxOf { it.high }
         val valRange = (maxVal - minVal).coerceAtLeast(1f)
 
+        val yTickResult = if (config.useNiceTicks) {
+            com.rl04x.koracharts.core.engine.AxisTickCalculator.computeNiceTicks(
+                min = minVal,
+                max = maxVal,
+                targetTicks = 4,
+                customStep = config.yAxisStep,
+                forceInteger = config.forceIntegerTicks,
+            )
+        } else null
+
+        val effectiveMinVal = yTickResult?.niceMin ?: minVal
+        val effectiveMaxVal = yTickResult?.niceMax ?: maxVal
+        val effectiveValRange = (effectiveMaxVal - effectiveMinVal).coerceAtLeast(1f)
+
         // Draw horizontal grid lines
         if (config.showGrid) {
-            val steps = 4
-            for (i in 0..steps) {
-                val y = topPadding + (drawHeight * (i.toFloat() / steps))
-                canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
-                if (config.showAxisLabels) {
-                    val yVal = maxVal - (valRange * (i.toFloat() / steps))
-                    canvas.drawText(String.format(Locale.US, "%.0f", yVal), leftPadding - 6f * density, y + 4f * density, labelPaint.apply { textAlign = Paint.Align.RIGHT })
+            if (yTickResult != null) {
+                for (yVal in yTickResult.ticks) {
+                    val pct = (yVal - effectiveMinVal) / effectiveValRange
+                    val y = topPadding + (1f - pct) * drawHeight
+                    if (y in (topPadding - 1f)..(baselineY + 1f)) {
+                        canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
+                        if (config.showAxisLabels) {
+                            val labelText = config.yAxisFormatter?.invoke(yVal)
+                                ?: if (config.forceIntegerTicks) String.format(
+                                    Locale.US,
+                                    "%.0f",
+                                    yVal
+                                ) else String.format(Locale.US, "%.1f", yVal)
+                            canvas.drawText(
+                                labelText,
+                                leftPadding - 6f * density,
+                                y + 4f * density,
+                                labelPaint.apply { textAlign = Paint.Align.RIGHT })
+                        }
+                    }
+                }
+            } else {
+                val steps = 4
+                for (i in 0..steps) {
+                    val y = topPadding + (drawHeight * (i.toFloat() / steps))
+                    canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
+                    if (config.showAxisLabels) {
+                        val yVal = maxVal - (valRange * (i.toFloat() / steps))
+                        canvas.drawText(
+                            String.format(Locale.US, "%.0f", yVal),
+                            leftPadding - 6f * density,
+                            y + 4f * density,
+                            labelPaint.apply { textAlign = Paint.Align.RIGHT })
+                    }
                 }
             }
         }
@@ -91,7 +134,7 @@ public class CandlestickRenderer : BaseRenderer<CandlestickEntry> {
             candlePaint.color = color
 
             fun toY(v: Float): Float {
-                return topPadding + (1f - (v - minVal) / valRange) * drawHeight
+                return topPadding + (1f - (v - effectiveMinVal) / effectiveValRange) * drawHeight
             }
 
             val highY = toY(entry.high)
@@ -114,7 +157,11 @@ public class CandlestickRenderer : BaseRenderer<CandlestickEntry> {
 
             if (config.showAxisLabels) {
                 val labelText = entry.label ?: String.format(Locale.US, "%.0f", entry.x)
-                canvas.drawText(labelText, cx, baselineY + 14f * density, labelPaint.apply { textAlign = Paint.Align.CENTER })
+                canvas.drawText(
+                    labelText,
+                    cx,
+                    baselineY + 14f * density,
+                    labelPaint.apply { textAlign = Paint.Align.CENTER })
             }
         }
     }

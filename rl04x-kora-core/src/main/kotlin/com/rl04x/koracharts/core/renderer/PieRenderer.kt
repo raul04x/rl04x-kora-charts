@@ -99,18 +99,27 @@ public class PieRenderer(
         val centerX = width / 2f
         val centerY = height / 2f
 
-        val oval = RectF(
-            centerX - radius,
-            centerY - radius,
-            centerX + radius,
-            centerY + radius,
-        )
+        val isDonut = holeRadiusRatio > 0f
+        val ringWidth = if (isDonut) radius * (1f - holeRadiusRatio) else 0f
+        val midRadius = if (isDonut) radius * (1f + holeRadiusRatio) / 2f else radius
 
-        val entries = data.firstOrNull()?.entries ?: return
+        val oval = if (isDonut) {
+            RectF(
+                centerX - midRadius,
+                centerY - midRadius,
+                centerX + midRadius,
+                centerY + midRadius
+            )
+        } else {
+            RectF(centerX - radius, centerY - radius, centerX + radius, centerY + radius)
+        }
+
+        val firstDataset = data.firstOrNull()
+        val entries = firstDataset?.entries ?: return
         val total = entries.sumOf { it.y.toDouble() }.toFloat()
         if (total <= 0f) return
 
-        val sliceColors = listOf(
+        val defaultColors = listOf(
             "#14B8A6".toColorInt(), // Teal
             "#F87171".toColorInt(), // Coral
             "#F59E0B".toColorInt(), // Amber/Yellow
@@ -127,6 +136,19 @@ public class PieRenderer(
             val isSelected = (config.selectedEntry == entry)
             val midAngleRad = Math.toRadians((startAngle + sweepAngle / 2f).toDouble())
 
+            val sliceColor = entry.color
+                ?: firstDataset.colors?.getOrNull(idx)
+                ?: defaultColors[idx % defaultColors.size]
+
+            slicePaint.color = sliceColor
+
+            if (isDonut) {
+                slicePaint.style = Paint.Style.STROKE
+                slicePaint.strokeWidth = ringWidth
+            } else {
+                slicePaint.style = Paint.Style.FILL
+            }
+
             if (isSelected) {
                 val explosionDist = 14f * density
                 val shiftX = (explosionDist * cos(midAngleRad)).toFloat()
@@ -139,15 +161,15 @@ public class PieRenderer(
                     oval.bottom + shiftY,
                 )
 
-                slicePaint.color = sliceColors[idx % sliceColors.size]
-                canvas.drawArc(shiftedOval, startAngle, sweepAngle, true, slicePaint)
+                canvas.drawArc(shiftedOval, startAngle, sweepAngle, !isDonut, slicePaint)
 
                 // Prepare glassmorphic badge overlay
                 val badgeRadius = radius + 20f * density
                 val bx = (centerX + shiftX + badgeRadius * cos(midAngleRad)).toFloat()
                 val by = (centerY + shiftY + badgeRadius * sin(midAngleRad)).toFloat()
                 val pct = (entry.y / total) * 100f
-                val badgeText = "${entry.label ?: "Item"}: ${String.format(Locale.US, "%.0f%%", pct)}"
+                val badgeText =
+                    "${entry.label ?: "Item"}: ${String.format(Locale.US, "%.0f%%", pct)}"
 
                 pendingSelectedBadge = Runnable {
                     badgeTextPaint.getTextBounds(badgeText, 0, badgeText.length, textBoundsRect)
@@ -169,13 +191,31 @@ public class PieRenderer(
 
                     // Screen border clamping
                     val screenMargin = 6f * density
-                    if (badgeRect.left < screenMargin) badgeRect.offset(screenMargin - badgeRect.left, 0f)
-                    if (badgeRect.right > width - screenMargin) badgeRect.offset((width - screenMargin) - badgeRect.right, 0f)
-                    if (badgeRect.top < screenMargin) badgeRect.offset(0f, screenMargin - badgeRect.top)
-                    if (badgeRect.bottom > height - screenMargin) badgeRect.offset(0f, (height - screenMargin) - badgeRect.bottom)
+                    if (badgeRect.left < screenMargin) badgeRect.offset(
+                        screenMargin - badgeRect.left,
+                        0f
+                    )
+                    if (badgeRect.right > width - screenMargin) badgeRect.offset(
+                        (width - screenMargin) - badgeRect.right,
+                        0f
+                    )
+                    if (badgeRect.top < screenMargin) badgeRect.offset(
+                        0f,
+                        screenMargin - badgeRect.top
+                    )
+                    if (badgeRect.bottom > height - screenMargin) badgeRect.offset(
+                        0f,
+                        (height - screenMargin) - badgeRect.bottom
+                    )
 
-                    val shadowRect = RectF(badgeRect.left, badgeRect.top + 2f * density, badgeRect.right, badgeRect.bottom + 2f * density)
-                    glassShadowPaint.color = Color.argb((0.25f * 255 * progress).toInt().coerceIn(0, 255), 0, 0, 0)
+                    val shadowRect = RectF(
+                        badgeRect.left,
+                        badgeRect.top + 2f * density,
+                        badgeRect.right,
+                        badgeRect.bottom + 2f * density
+                    )
+                    glassShadowPaint.color =
+                        Color.argb((0.25f * 255 * progress).toInt().coerceIn(0, 255), 0, 0, 0)
                     canvas.drawRoundRect(shadowRect, 7f * density, 7f * density, glassShadowPaint)
 
                     glassBgPaint.color = config.style.tooltipBackgroundColor
@@ -190,25 +230,38 @@ public class PieRenderer(
                     canvas.drawText(badgeText, badgeRect.centerX(), textY, badgeTextPaint)
                 }
             } else {
-                slicePaint.color = sliceColors[idx % sliceColors.size]
-                canvas.drawArc(oval, startAngle, sweepAngle, true, slicePaint)
+                canvas.drawArc(oval, startAngle, sweepAngle, !isDonut, slicePaint)
             }
 
             if (config.showAxisLabels && sweepAngle > 15f && progress >= 0.8f && !isSelected) {
-                val labelRadius = if (holeRadiusRatio > 0f) radius * (1f + holeRadiusRatio) / 2f else radius * 0.65f
+                val labelRadius = if (isDonut) midRadius else radius * 0.65f
                 val lx = (centerX + labelRadius * cos(midAngleRad)).toFloat()
                 val ly = (centerY + labelRadius * sin(midAngleRad)).toFloat() + 4f * density
                 val pct = (entry.y / total) * 100f
                 val text = String.format(Locale.US, "%.0f%%", pct)
+
+                // Custom textColor or Google WCAG Relative Luminance Contrast Calculation
+                val calculatedContrastColor =
+                    if (androidx.core.graphics.ColorUtils.calculateLuminance(sliceColor) > 0.179) {
+                        Color.parseColor("#0F172A")
+                    } else {
+                        Color.WHITE
+                    }
+
+                labelPaint.color =
+                    entry.textColor ?: firstDataset.labelTextColor ?: calculatedContrastColor
+
                 canvas.drawText(text, lx, ly, labelPaint)
             }
 
             startAngle += (entry.y / total) * 360f
         }
 
-        if (holeRadiusRatio > 0f) {
+        if (isDonut) {
             val holeRadius = radius * holeRadiusRatio
-            canvas.drawCircle(centerX, centerY, holeRadius, holePaint)
+            if (Color.alpha(config.style.cardBackgroundColor) > 0) {
+                canvas.drawCircle(centerX, centerY, holeRadius, holePaint)
+            }
 
             // Safe text bounds strictly inside donut hole (80% of inner diameter)
             val maxTextWidth = holeRadius * 1.6f

@@ -9,6 +9,8 @@ import android.graphics.RectF
 import com.rl04x.koracharts.core.model.ChartConfig
 import com.rl04x.koracharts.core.model.StackedBarEntry
 import java.util.Locale
+import androidx.core.graphics.withRotation
+import androidx.core.graphics.toColorInt
 
 /**
  * Renderer for Stacked Bar Charts with top-only rounded corners and segment value labels.
@@ -58,9 +60,13 @@ public class StackedBarRenderer : BaseRenderer<StackedBarEntry> {
         totalValuePaint.color = config.style.titleTextColor
         totalValuePaint.textSize = 10f * density
 
-        val hasRotatedLabels = config.showAxisLabels && (config.xAxisLabelRotation != 0f || data.any { (it.label?.length ?: 0) > 8 })
+        val hasRotatedLabels =
+            config.showAxisLabels && (config.xAxisLabelRotation != 0f || data.any {
+                (it.label?.length ?: 0) > 8
+            })
 
-        val leftPadding = if (config.showAxisLabels) config.paddingDp * density + 24f * density else config.paddingDp * density
+        val leftPadding =
+            if (config.showAxisLabels) config.paddingDp * density + 24f * density else config.paddingDp * density
         val bottomPadding = if (config.showAxisLabels) {
             config.paddingDp * density + (if (hasRotatedLabels) 60f * density else 20f * density)
         } else {
@@ -77,15 +83,54 @@ public class StackedBarRenderer : BaseRenderer<StackedBarEntry> {
         val totals = data.map { it.values.sum() }
         val maxTotal = totals.maxOrNull()?.coerceAtLeast(1f) ?: 100f
 
+        val yTickResult = if (config.useNiceTicks) {
+            com.rl04x.koracharts.core.engine.AxisTickCalculator.computeNiceTicks(
+                min = 0f,
+                max = maxTotal,
+                targetTicks = 4,
+                customStep = config.yAxisStep,
+                forceInteger = config.forceIntegerTicks,
+            )
+        } else null
+
+        val effectiveMaxTotal = yTickResult?.niceMax ?: maxTotal
+
         // Draw horizontal grid lines
         if (config.showGrid) {
-            val steps = 4
-            for (i in 0..steps) {
-                val y = topPadding + (drawHeight * (i.toFloat() / steps))
-                canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
-                if (config.showAxisLabels) {
-                    val valY = maxTotal * (1f - (i.toFloat() / steps))
-                    canvas.drawText(String.format(Locale.US, "%.0f", valY), leftPadding - 6f * density, y + 4f * density, labelPaint.apply { textAlign = Paint.Align.RIGHT })
+            if (yTickResult != null) {
+                for (yVal in yTickResult.ticks) {
+                    val pct = yVal / effectiveMaxTotal
+                    val y = topPadding + (1f - pct) * drawHeight
+                    if (y in (topPadding - 1f)..(baselineY + 1f)) {
+                        canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
+                        if (config.showAxisLabels) {
+                            val labelText = config.yAxisFormatter?.invoke(yVal)
+                                ?: if (config.forceIntegerTicks) String.format(
+                                    Locale.US,
+                                    "%.0f",
+                                    yVal
+                                ) else String.format(Locale.US, "%.1f", yVal)
+                            canvas.drawText(
+                                labelText,
+                                leftPadding - 6f * density,
+                                y + 4f * density,
+                                labelPaint.apply { textAlign = Paint.Align.RIGHT })
+                        }
+                    }
+                }
+            } else {
+                val steps = 4
+                for (i in 0..steps) {
+                    val y = topPadding + (drawHeight * (i.toFloat() / steps))
+                    canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
+                    if (config.showAxisLabels) {
+                        val valY = maxTotal * (1f - (i.toFloat() / steps))
+                        canvas.drawText(
+                            String.format(Locale.US, "%.0f", valY),
+                            leftPadding - 6f * density,
+                            y + 4f * density,
+                            labelPaint.apply { textAlign = Paint.Align.RIGHT })
+                    }
                 }
             }
         }
@@ -101,10 +146,11 @@ public class StackedBarRenderer : BaseRenderer<StackedBarEntry> {
 
             var currentY = baselineY
             for ((vIdx, valItem) in entry.values.withIndex()) {
-                val segmentHeight = (valItem / maxTotal) * drawHeight * progress
+                val segmentHeight = (valItem / effectiveMaxTotal) * drawHeight * progress
                 val segmentTop = currentY - segmentHeight
 
-                segmentPaint.color = entry.colors.getOrElse(vIdx) { config.style.highlightLineColor }
+                segmentPaint.color =
+                    entry.colors.getOrElse(vIdx) { config.style.highlightLineColor }
                 val rect = RectF(barLeft, segmentTop, barRight, currentY)
 
                 val isTopSegment = (vIdx == entry.values.lastIndex)
@@ -124,8 +170,29 @@ public class StackedBarRenderer : BaseRenderer<StackedBarEntry> {
 
                 // Draw segment value label inside segment if there is enough height
                 if (segmentHeight >= 14f * density) {
+                    val segmentColor =
+                        entry.colors.getOrElse(vIdx) { config.style.highlightLineColor }
+                    val customTextColor = entry.textColors?.getOrNull(vIdx)
+
+                    val contrastTextColor =
+                        customTextColor ?: if (androidx.core.graphics.ColorUtils.calculateLuminance(
+                                segmentColor
+                            ) > 0.179
+                        ) {
+                            "#0F172A".toColorInt()
+                        } else {
+                            Color.WHITE
+                        }
+
+                    segmentValuePaint.color = contrastTextColor
+
                     val valText = String.format(Locale.US, "%.0f", valItem)
-                    canvas.drawText(valText, slotCenterX, segmentTop + (segmentHeight / 2f) + 3f * density, segmentValuePaint)
+                    canvas.drawText(
+                        valText,
+                        slotCenterX,
+                        segmentTop + (segmentHeight / 2f) + 3f * density,
+                        segmentValuePaint
+                    )
                 }
 
                 currentY = segmentTop
@@ -133,7 +200,8 @@ public class StackedBarRenderer : BaseRenderer<StackedBarEntry> {
 
             // Draw total value label on top of the bar
             val totalVal = entry.values.sum()
-            val animatedTotalY = baselineY - ((totalVal / maxTotal) * drawHeight * progress)
+            val animatedTotalY =
+                baselineY - ((totalVal / effectiveMaxTotal) * drawHeight * progress)
             canvas.drawText(
                 String.format(Locale.US, "%.0f", totalVal),
                 slotCenterX,
@@ -154,17 +222,24 @@ public class StackedBarRenderer : BaseRenderer<StackedBarEntry> {
                         else -> 0f
                     }
 
-                    val labelX = slotCenterX
                     val labelY = baselineY + 10f * density
 
                     if (rotation != 0f) {
-                        canvas.save()
-                        canvas.rotate(rotation, labelX, labelY)
-                        canvas.drawText(rawText, labelX, labelY, labelPaint.apply { textAlign = Paint.Align.RIGHT })
-                        canvas.restore()
+                        canvas.withRotation(rotation, slotCenterX, labelY) {
+                            drawText(
+                                rawText,
+                                slotCenterX,
+                                labelY,
+                                labelPaint.apply { textAlign = Paint.Align.RIGHT })
+                        }
                     } else {
-                        val labelText = if (rawText.length > config.xAxisLabelMaxLen) rawText.take(config.xAxisLabelMaxLen - 1) + "…" else rawText
-                        canvas.drawText(labelText, labelX, labelY, labelPaint.apply { textAlign = Paint.Align.CENTER })
+                        val labelText =
+                            if (rawText.length > config.xAxisLabelMaxLen) rawText.take(config.xAxisLabelMaxLen - 1) + "…" else rawText
+                        canvas.drawText(
+                            labelText,
+                            slotCenterX,
+                            labelY,
+                            labelPaint.apply { textAlign = Paint.Align.CENTER })
                     }
                 }
             }

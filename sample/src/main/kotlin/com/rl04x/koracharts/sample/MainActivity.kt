@@ -66,6 +66,7 @@ fun DashboardScreen() {
     // 0 = Midnight Dark, 1 = OLED Deep Dark, 2 = Light
     var themeMode by remember { mutableIntStateOf(0) }
     var enableZoom by remember { mutableStateOf(true) }
+    var useNiceTicks by remember { mutableStateOf(true) }
     var selectedHeightDp by remember { mutableIntStateOf(220) }
 
     val chartStyle = remember(themeMode) {
@@ -76,17 +77,45 @@ fun DashboardScreen() {
         }
     }
 
-    val chartConfig = remember(chartStyle, enableZoom) {
+    val chartConfig = remember(chartStyle, enableZoom, useNiceTicks) {
         ChartConfig(
             style = chartStyle,
             enableZoom = enableZoom,
+            useNiceTicks = useNiceTicks,
+            forceIntegerTicks = true,
             showGrid = true,
             showAxisLabels = true,
             showHighlightLine = true,
         )
     }
 
-    val (trafficData, _) = remember { SampleData.generateNetworkTrafficLineData() }
+    val expensesConfig = remember(chartConfig) {
+        chartConfig.copy(
+            showMinMaxBadges = true,
+            showAverageLine = true,
+            compactNumberFormatting = true,
+            valuePrefix = "€",
+            referenceLines = listOf(
+                com.rl04x.koracharts.core.model.ReferenceLine(
+                    value = 1500f,
+                    label = "Presupuesto €1.5k",
+                    color = android.graphics.Color.parseColor("#EF4444"),
+                ),
+            ),
+            targetZones = listOf(
+                com.rl04x.koracharts.core.model.TargetZone(
+                    minY = 500f,
+                    maxY = 1200f,
+                    label = "Zona de Control",
+                    color = android.graphics.Color.parseColor("#10B981"),
+                    fillAlpha = 0.12f,
+                ),
+            ),
+        )
+    }
+
+    val (expensesData, _) = remember { SampleData.generateMonthlyExpensesLineData() }
+    val (revenueData, _) = remember { SampleData.generateRevenueThousandsLineData() }
     val (categoryData, _) = remember { SampleData.generateCategorySalesBarData() }
     val latencyData = remember { SampleData.generateDatabaseLatencyHorizontalData() }
     val browserData = remember { SampleData.generateBrowserSharePieData() }
@@ -133,13 +162,19 @@ fun DashboardScreen() {
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Control Bar (Selector de Temas + Selector de Altura)
+            // Control Bar: 1. Selector de Tema
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Selector de Tema (Midnight | OLED | Claro)
+                Text(
+                    text = "Tema visual:",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(chartStyle.labelTextColor),
+                )
+
                 Surface(
                     shape = RoundedCornerShape(24.dp),
                     color = Color(chartStyle.cardBackgroundColor),
@@ -195,24 +230,69 @@ fun DashboardScreen() {
                         }
                     }
                 }
+            }
 
-                // Control de Zoom & Pan
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color(chartStyle.cardBackgroundColor),
-                    border = BorderStroke(1.dp, Color(chartStyle.cardBorderColor)),
-                    modifier = Modifier.clickable { enableZoom = !enableZoom },
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Control Bar: 2. Fila de Botones Interactivos (Zoom + Escala)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Opciones:",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(chartStyle.labelTextColor),
+                )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                    // Control de Zoom & Pan
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(chartStyle.cardBackgroundColor),
+                        border = BorderStroke(1.dp, Color(chartStyle.cardBorderColor)),
+                        modifier = Modifier.clickable { enableZoom = !enableZoom },
                     ) {
-                        Text(
-                            text = if (enableZoom) "🔍 Zoom: ON" else "🔍 Zoom: OFF",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (enableZoom) Color(chartStyle.badgeTextColor) else Color(chartStyle.labelTextColor),
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = if (enableZoom) "🔍 Zoom: ON" else "🔍 Zoom: OFF",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (enableZoom) Color(chartStyle.badgeTextColor) else Color(
+                                    chartStyle.labelTextColor
+                                ),
+                            )
+                        }
+                    }
+
+                    // Control de Escala Matemática / Nice Ticks
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(chartStyle.cardBackgroundColor),
+                        border = BorderStroke(1.dp, Color(chartStyle.cardBorderColor)),
+                        modifier = Modifier.clickable { useNiceTicks = !useNiceTicks },
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = if (useNiceTicks) "🔢 Escala: ON" else "🔢 Escala: OFF",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (useNiceTicks) Color(chartStyle.badgeTextColor) else Color(
+                                    chartStyle.labelTextColor
+                                ),
+                            )
+                        }
                     }
                 }
             }
@@ -241,7 +321,11 @@ fun DashboardScreen() {
                         modifier = Modifier.padding(2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        listOf(180 to "📐 180dp", 240 to "📜 240dp", 320 to "🏗️ 320dp").forEach { (hDp, title) ->
+                        listOf(
+                            180 to "📐 180dp",
+                            240 to "📜 240dp",
+                            320 to "🏗️ 320dp"
+                        ).forEach { (hDp, title) ->
                             val isSelected = (selectedHeightDp == hDp)
                             Box(
                                 modifier = Modifier
@@ -264,17 +348,35 @@ fun DashboardScreen() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 1. Line Chart: Tráfico de Red
+            // 1. Line Chart: Comparativa de Gastos (Mes Actual vs Mes Anterior)
             KoraChartCard(
-                title = "Tráfico de Red",
-                subtitle = "Rendimiento mensual (Mbps)",
-                badgeText = "+12.4%",
+                title = "Comparativa de Gastos",
+                subtitle = "Mes Actual vs Mes Anterior (€)",
+                badgeText = "-8.5% vs anterior",
                 chartHeight = selectedHeightDp.dp,
                 style = chartStyle,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 KoraLineChart(
-                    datasets = trafficData,
+                    datasets = expensesData,
+                    config = expensesConfig,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 1b. Line Chart: Ingresos Anuales (Escala en Miles)
+            KoraChartCard(
+                title = "Ingresos Anuales (Escala en Miles)",
+                subtitle = "Ejes X e Y con saltos matemáticos de 500k/1000k",
+                badgeText = "Escala N-Ticks",
+                chartHeight = selectedHeightDp.dp,
+                style = chartStyle,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                KoraLineChart(
+                    datasets = revenueData,
                     config = chartConfig,
                     modifier = Modifier.fillMaxSize(),
                 )
