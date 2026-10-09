@@ -78,13 +78,13 @@ dependencyResolutionManagement {
 ```kotlin
 dependencies {
     // For Jetpack Compose components
-    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-compose:0.1.0-alpha02")
+    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-compose:1.0.0-alpha03")
 
     // Core charting engine
-    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-core:0.1.0-alpha02")
+    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-core:1.0.0-alpha03")
 
     // For Android Views XML support (optional)
-    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-views:0.1.0-alpha02")
+    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-views:1.0.0-alpha03")
 }
 ```
 
