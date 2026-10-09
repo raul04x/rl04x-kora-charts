@@ -66,7 +66,27 @@ public class PieRenderer(
         textAlign = Paint.Align.CENTER
     }
 
+    private val calloutLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1.2f
+    }
+
+    private val calloutTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 10f
+    }
+
     private val textBoundsRect = Rect()
+
+    private data class CalloutItem(
+        val p1x: Float,
+        val p1y: Float,
+        val p2x: Float,
+        val rawP2y: Float,
+        val isRightSide: Boolean,
+        val sliceColor: Int,
+        val textColor: Int,
+        val text: String,
+    )
 
     override fun draw(
         canvas: Canvas,
@@ -130,6 +150,8 @@ public class PieRenderer(
 
         var startAngle = -90f
         var pendingSelectedBadge: Runnable? = null
+        val rightCallouts = mutableListOf<CalloutItem>()
+        val leftCallouts = mutableListOf<CalloutItem>()
 
         for ((idx, entry) in entries.withIndex()) {
             val sweepAngle = (entry.y / total) * 360f * progress
@@ -233,29 +255,113 @@ public class PieRenderer(
                 canvas.drawArc(oval, startAngle, sweepAngle, !isDonut, slicePaint)
             }
 
-            if (config.showAxisLabels && sweepAngle > 15f && progress >= 0.8f && !isSelected) {
-                val labelRadius = if (isDonut) midRadius else radius * 0.65f
-                val lx = (centerX + labelRadius * cos(midAngleRad)).toFloat()
-                val ly = (centerY + labelRadius * sin(midAngleRad)).toFloat() + 4f * density
+            if (config.showAxisLabels && progress >= 0.8f && !isSelected) {
                 val pct = (entry.y / total) * 100f
-                val text = String.format(Locale.US, "%.0f%%", pct)
+                val pctText = String.format(Locale.US, "%.0f%%", pct)
 
-                // Custom textColor or Google WCAG Relative Luminance Contrast Calculation
-                val calculatedContrastColor =
-                    if (androidx.core.graphics.ColorUtils.calculateLuminance(sliceColor) > 0.179) {
-                        Color.parseColor("#0F172A")
-                    } else {
-                        Color.WHITE
-                    }
+                if (sweepAngle > 18f) {
+                    val labelRadius = if (isDonut) midRadius else radius * 0.65f
+                    val lx = (centerX + labelRadius * cos(midAngleRad)).toFloat()
+                    val ly = (centerY + labelRadius * sin(midAngleRad)).toFloat() + 4f * density
 
-                labelPaint.color =
-                    entry.textColor ?: firstDataset.labelTextColor ?: calculatedContrastColor
+                    val calculatedContrastColor =
+                        com.rl04x.koracharts.core.util.NumberFormatterUtils.calculateHarmoniousContrastColor(
+                            sliceColor
+                        )
 
-                canvas.drawText(text, lx, ly, labelPaint)
+                    labelPaint.color =
+                        entry.textColor ?: firstDataset.labelTextColor ?: calculatedContrastColor
+
+                    canvas.drawText(pctText, lx, ly, labelPaint)
+                } else if (sweepAngle > 1f) {
+                    val p1x = (centerX + radius * cos(midAngleRad)).toFloat()
+                    val p1y = (centerY + radius * sin(midAngleRad)).toFloat()
+
+                    val lineDist = 12f * density
+                    val p2x = (centerX + (radius + lineDist) * cos(midAngleRad)).toFloat()
+                    val p2y = (centerY + (radius + lineDist) * sin(midAngleRad)).toFloat()
+
+                    val isRightSide = cos(midAngleRad) >= 0
+                    val textColor = entry.textColor ?: config.style.labelTextColor
+                    val displayText = entry.label?.let { "$it: $pctText" } ?: pctText
+
+                    val item = CalloutItem(
+                        p1x = p1x,
+                        p1y = p1y,
+                        p2x = p2x,
+                        rawP2y = p2y,
+                        isRightSide = isRightSide,
+                        sliceColor = sliceColor,
+                        textColor = textColor,
+                        text = displayText,
+                    )
+
+                    if (isRightSide) rightCallouts.add(item) else leftCallouts.add(item)
+                }
             }
 
             startAngle += (entry.y / total) * 360f
         }
+
+        // Resolve vertical Y collisions for external callout lines
+        fun resolveAndDrawCallouts(items: List<CalloutItem>) {
+            if (items.isEmpty()) return
+            val sorted = items.sortedBy { it.rawP2y }
+            val minGap = 13f * density
+            val resultY = sorted.map { it.rawP2y }.toMutableList()
+
+            // Forward pass: top to bottom push
+            for (i in 1 until resultY.size) {
+                if (resultY[i] < resultY[i - 1] + minGap) {
+                    resultY[i] = resultY[i - 1] + minGap
+                }
+            }
+
+            // Backward pass: bottom to top push if exceeding height
+            val maxAllowedY = height - 10f * density
+            val minAllowedY = 10f * density
+            if (resultY.last() > maxAllowedY) {
+                resultY[resultY.lastIndex] = maxAllowedY
+                for (i in resultY.lastIndex - 1 downTo 0) {
+                    if (resultY[i] > resultY[i + 1] - minGap) {
+                        resultY[i] = resultY[i + 1] - minGap
+                    }
+                }
+            }
+            if (resultY.first() < minAllowedY) {
+                resultY[0] = minAllowedY
+                for (i in 1 until resultY.size) {
+                    if (resultY[i] < resultY[i - 1] + minGap) {
+                        resultY[i] = resultY[i - 1] + minGap
+                    }
+                }
+            }
+
+            for ((i, item) in sorted.withIndex()) {
+                val adjustedY = resultY[i]
+                val armLength = 10f * density
+                val p3x = if (item.isRightSide) item.p2x + armLength else item.p2x - armLength
+
+                calloutLinePaint.color = item.sliceColor
+                calloutLinePaint.strokeWidth = 1.2f * density
+
+                canvas.drawLine(item.p1x, item.p1y, item.p2x, adjustedY, calloutLinePaint)
+                canvas.drawLine(item.p2x, adjustedY, p3x, adjustedY, calloutLinePaint)
+
+                val tx = if (item.isRightSide) p3x + 4f * density else p3x - 4f * density
+                val ty = adjustedY + 3.5f * density
+
+                calloutTextPaint.color = item.textColor
+                calloutTextPaint.textSize = 10f * density
+                calloutTextPaint.textAlign =
+                    if (item.isRightSide) Paint.Align.LEFT else Paint.Align.RIGHT
+
+                canvas.drawText(item.text, tx, ty, calloutTextPaint)
+            }
+        }
+
+        resolveAndDrawCallouts(rightCallouts)
+        resolveAndDrawCallouts(leftCallouts)
 
         if (isDonut) {
             val holeRadius = radius * holeRadiusRatio

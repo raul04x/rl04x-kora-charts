@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Title Header -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🖼️ Gallery: Traditional XML Views"
+            android:textColor="#F8FAFC"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="16dp"
+            android:text="Demonstration of all Kora Chart Custom Views declared in Android XML layout files"
+            android:textColor="#94A3B8"
+            android:textSize="13sp" />
+
+        <!-- 1. Line Chart XML View Card -->
+        <com.rl04x.koracharts.views.KoraChartCardView
+            android:id="@+id/card1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:kora_cardBadgeText="-8.5% vs last"
+            app:kora_cardSubtitle="Current Month vs Previous Month (€)"
+            app:kora_cardTitle="Expenses Comparison">
+
+            <com.rl04x.koracharts.views.KoraLineChartView
+                android:id="@+id/lineChartView"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                app:kora_animationDuration="600"
+                app:kora_gradientFill="true"
+                app:kora_isCurved="true"
+                app:kora_showAxes="true"
+                app:kora_showAxisLabels="true"
+                app:kora_showGrid="true"
+                app:kora_showLegend="true" />
+        </com.rl04x.koracharts.views.KoraChartCardView>
+
+        <!-- 2. Bar Chart XML View Card -->
+        <com.rl04x.koracharts.views.KoraChartCardView
+            android:id="@+id/card2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:kora_cardBadgeText="Top: Toys"
+            app:kora_cardSubtitle="Year 2025 (€k)"
+            app:kora_cardTitle="Sales by Category">
+
+            <com.rl04x.koracharts.views.KoraBarChartView
+                android:id="@+id/barChartView"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                app:kora_animationDuration="600"
+                app:kora_showAxes="true"
+                app:kora_showAxisLabels="true"
+                app:kora_showGrid="true" />
+        </com.rl04x.koracharts.views.KoraChartCardView>
+
+        <!-- 3. Horizontal Bar Chart XML View Card -->
+        <com.rl04x.koracharts.views.KoraChartCardView
+            android:id="@+id/card3"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:kora_cardSubtitle="Average response time (ms)"
+            app:kora_cardTitle="Database Engine Latency">
+
+            <com.rl04x.koracharts.views.KoraHorizontalBarChartView
+                android:id="@+id/horizontalBarChartView"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                app:kora_animationDuration="600"
+                app:kora_showAxisLabels="true" />
+        </com.rl04x.koracharts.views.KoraChartCardView>
+
+        <!-- 4. Pie/Donut Chart XML View Card -->
+        <com.rl04x.koracharts.views.KoraChartCardView
+            android:id="@+id/card4"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:kora_cardSubtitle="Global market share (%)"
+            app:kora_cardTitle="Web Browsers">
+
+            <com.rl04x.koracharts.views.KoraPieChartView
+                android:id="@+id/pieChartView"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                app:kora_animationDuration="600"
+                app:kora_showAxisLabels="true" />
+        </com.rl04x.koracharts.views.KoraChartCardView>
+
+        <!-- 5. Stacked Bar Chart XML View Card -->
+        <com.rl04x.koracharts.views.KoraChartCardView
+            android:id="@+id/card5"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:kora_cardSubtitle="Accumulated breakdown (€k)"
+            app:kora_cardTitle="Sales Channels">
+
+            <com.rl04x.koracharts.views.KoraStackedBarChartView
+                android:id="@+id/stackedBarChartView"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                app:kora_animationDuration="600"
+                app:kora_showAxisLabels="true"
+                app:kora_showGrid="true" />
+        </com.rl04x.koracharts.views.KoraChartCardView>
+
+        <!-- 6. Candlestick Chart XML View Card -->
+        <com.rl04x.koracharts.views.KoraChartCardView
+            android:id="@+id/card6"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:kora_cardBadgeText="+8.5%"
+            app:kora_cardSubtitle="Daily candles"
+            app:kora_cardTitle="KORA / USD Quote">
+
+            <com.rl04x.koracharts.views.KoraCandlestickChartView
+                android:id="@+id/candlestickChartView"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                app:kora_animationDuration="600"
+                app:kora_showAxisLabels="true"
+                app:kora_showGrid="true" />
+        </com.rl04x.koracharts.views.KoraChartCardView>
+
+        <!-- 7. Radar Chart XML View Card -->
+        <com.rl04x.koracharts.views.KoraChartCardView
+            android:id="@+id/card7"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:kora_cardSubtitle="Senior vs Junior assessment"
+            app:kora_cardTitle="Developer Profile">
+
+            <com.rl04x.koracharts.views.KoraRadarChartView
+                android:id="@+id/radarChartView"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                app:kora_animationDuration="600" />
+        </com.rl04x.koracharts.views.KoraChartCardView>
+
+        <!-- 8. Combined Chart XML View Card -->
+        <com.rl04x.koracharts.views.KoraChartCardView
+            android:id="@+id/card8"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:kora_cardSubtitle="Bars: Users · Line: Conversions"
+            app:kora_cardTitle="Active Users vs Conversions">
+
+            <com.rl04x.koracharts.views.KoraCombinedChartView
+                android:id="@+id/combinedChartView"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                app:kora_animationDuration="600"
+                app:kora_showAxisLabels="true"
+                app:kora_showGrid="true" />
+        </com.rl04x.koracharts.views.KoraChartCardView>
+
+        <!-- 9. Bubble Chart XML View Card -->
+        <com.rl04x.koracharts.views.KoraChartCardView
+            android:id="@+id/card9"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:kora_cardSubtitle="X: Risk · Y: Return · Radius: Budget"
+            app:kora_cardTitle="Project Portfolio Matrix">
+
+            <com.rl04x.koracharts.views.KoraBubbleChartView
+                android:id="@+id/bubbleChartView"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                app:kora_animationDuration="600"
+                app:kora_showAxisLabels="true"
+                app:kora_showGrid="true" />
+        </com.rl04x.koracharts.views.KoraChartCardView>
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

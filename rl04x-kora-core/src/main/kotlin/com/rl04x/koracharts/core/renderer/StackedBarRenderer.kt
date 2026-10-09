@@ -6,11 +6,10 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import androidx.core.graphics.withRotation
 import com.rl04x.koracharts.core.model.ChartConfig
 import com.rl04x.koracharts.core.model.StackedBarEntry
 import java.util.Locale
-import androidx.core.graphics.withRotation
-import androidx.core.graphics.toColorInt
 
 /**
  * Renderer for Stacked Bar Charts with top-only rounded corners and segment value labels.
@@ -175,14 +174,10 @@ public class StackedBarRenderer : BaseRenderer<StackedBarEntry> {
                     val customTextColor = entry.textColors?.getOrNull(vIdx)
 
                     val contrastTextColor =
-                        customTextColor ?: if (androidx.core.graphics.ColorUtils.calculateLuminance(
+                        customTextColor
+                            ?: com.rl04x.koracharts.core.util.NumberFormatterUtils.calculateHarmoniousContrastColor(
                                 segmentColor
-                            ) > 0.179
-                        ) {
-                            "#0F172A".toColorInt()
-                        } else {
-                            Color.WHITE
-                        }
+                            )
 
                     segmentValuePaint.color = contrastTextColor
 

@@ -1,8 +1,8 @@
 [versions]
 agp = "9.4.1"
-kotlin = "2.4.20"
+kora = "1.0.0-alpha03"
+kotlin = "2.4.21"
 compose-bom = "2026.09.00"
-compose-compiler = "1.5.14"
 core-ktx = "1.19.1"
 appcompat = "1.8.0"
 material = "1.14.0"
@@ -51,5 +51,3 @@ maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "mavenPubli
 
 [bundles]
 compose-ui = ["compose-ui", "compose-ui-tooling-preview", "compose-foundation", "compose-runtime", "compose-material3"]
-testing = ["junit"]
-testing-ui = ["junit-ext", "espresso"]

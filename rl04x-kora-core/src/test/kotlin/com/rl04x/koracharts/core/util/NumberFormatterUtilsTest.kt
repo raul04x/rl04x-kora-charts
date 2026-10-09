@@ -25,6 +25,34 @@ public class NumberFormatterUtilsTest {
 
     @Test
     public fun `formatCompact includes prefix and suffix`() {
-        assertEquals("€1.5K/mo", NumberFormatterUtils.formatCompact(1500f, valuePrefix = "€", valueSuffix = "/mo"))
+        assertEquals(
+            "€1.5K/mo",
+            NumberFormatterUtils.formatCompact(1500f, valuePrefix = "€", valueSuffix = "/mo")
+        )
+    }
+
+    @Test
+    public fun `calculateHarmoniousContrastColor produces WCAG contrast color in same hue family`() {
+        fun ratio(c1: Int, c2: Int): Float {
+            val l1 = NumberFormatterUtils.calculateRelativeLuminance(c1)
+            val l2 = NumberFormatterUtils.calculateRelativeLuminance(c2)
+            return (maxOf(l1, l2) + 0.05f) / (minOf(l1, l2) + 0.05f)
+        }
+
+        val brightYellow = 0xFFF59E0B.toInt()
+        val contrastYellowText = NumberFormatterUtils.calculateHarmoniousContrastColor(brightYellow)
+        val contrastYellowRatio = ratio(contrastYellowText, brightYellow)
+        org.junit.Assert.assertTrue(
+            "Contrast ratio must meet WCAG AA >= 4.5",
+            contrastYellowRatio >= 4.5f
+        )
+
+        val darkIndigo = 0xFF3730A3.toInt()
+        val contrastIndigoText = NumberFormatterUtils.calculateHarmoniousContrastColor(darkIndigo)
+        val contrastIndigoRatio = ratio(contrastIndigoText, darkIndigo)
+        org.junit.Assert.assertTrue(
+            "Contrast ratio must meet WCAG AA >= 4.5",
+            contrastIndigoRatio >= 4.5f
+        )
     }
 }

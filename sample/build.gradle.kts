@@ -1,8 +1,8 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
-// sample: App de demo que muestra todas las gráficas en acción.
-// Se publica en Play Store como galería pública de Kora Charts.
+// sample: Demo app showcasing all charts in action.
+// Published to Play Store as a public gallery for Kora Charts.
 
 plugins {
     id("com.android.application")
@@ -18,7 +18,7 @@ android {
         minSdk = 32
         targetSdk = 37
         versionCode = 1
-        versionName = "0.1.0-alpha01"
+        versionName = libs.versions.kora.get()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -51,7 +51,7 @@ tasks.withType<KotlinCompile>().configureEach {
 }
 
 dependencies {
-    // Los tres módulos de Kora
+    // The three Kora modules
     implementation(project(":rl04x-kora-core"))
     implementation(project(":rl04x-kora-compose"))
     implementation(project(":rl04x-kora-views"))

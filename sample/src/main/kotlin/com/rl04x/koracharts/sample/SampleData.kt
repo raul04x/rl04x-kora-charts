@@ -11,7 +11,6 @@ import com.rl04x.koracharts.core.model.StackedBarEntry
 
 object SampleData {
 
-    // Paleta de colores atractiva
     val tealColor = "#14B8A6".toColorInt()
     val purpleColor = "#8B5CF6".toColorInt()
     val yellowColor = "#F59E0B".toColorInt()
@@ -20,11 +19,10 @@ object SampleData {
     val lightPurpleColor = "#A78BFA".toColorInt()
     val emeraldColor = "#10B981".toColorInt()
     val blueColor = "#3B82F6".toColorInt()
-    val whiteColor = "#FFFFFF".toColorInt()
 
-    // 1. Line Chart: Comparativa de Gastos (Mes Actual vs Mes Anterior)
+    // 1. Line Chart: Expenses Comparison (Current Month vs Previous Month)
     fun generateMonthlyExpensesLineData(): Pair<List<Dataset>, Entry> {
-        val days = listOf("Día 1", "Día 5", "Día 10", "Día 15", "Día 20", "Día 25", "Día 30")
+        val days = listOf("Day 1", "Day 5", "Day 10", "Day 15", "Day 20", "Day 25", "Day 30")
         val currentMonthValues = listOf(120f, 340f, 580f, 820f, 1146f, 1420f, 1750f)
         val previousMonthValues = listOf(150f, 410f, 690f, 980f, 1310f, 1650f, 1920f)
 
@@ -37,7 +35,7 @@ object SampleData {
 
         val currentDataset = Dataset(
             entries = currentEntries,
-            label = "Mes Actual",
+            label = "Current Month",
             color = tealColor,
             lineWidth = 2f,
             pointRadius = 3f,
@@ -50,7 +48,7 @@ object SampleData {
 
         val previousDataset = Dataset(
             entries = previousEntries,
-            label = "Mes Anterior",
+            label = "Previous Month",
             color = "#818CF8".toColorInt(),
             lineWidth = 1.8f,
             pointRadius = 2.5f,
@@ -62,20 +60,20 @@ object SampleData {
         return Pair(listOf(currentDataset, previousDataset), currentEntries[4])
     }
 
-    // 2. Bar Chart: Ventas por Categoría de Producto
+    // 2. Bar Chart: Product Sales by Category
     fun generateCategorySalesBarData(): Pair<List<Dataset>, Entry> {
         val categories =
-            listOf("Electro", "Ropa", "Hogar", "Deportes", "Libros", "Juguetes", "Belleza", "Motor")
+            listOf("Electronics", "Clothing", "Home", "Sports", "Books", "Toys", "Beauty", "Auto")
         val values = listOf(42f, 65f, 52f, 88f, 70f, 95f, 60f, 78f)
 
         val entries = categories.mapIndexed { idx, cat ->
             Entry(idx.toFloat(), values[idx], "$cat (€${values[idx].toInt()}k)")
         }
-        val selectedEntry = entries[5] // Juguetes (€95k)
+        val selectedEntry = entries[5]
 
         val dataset = Dataset(
             entries = entries,
-            label = "Ventas",
+            label = "Sales",
             color = cyanColor,
             lineWidth = 2f,
         )
@@ -83,7 +81,7 @@ object SampleData {
         return Pair(listOf(dataset), selectedEntry)
     }
 
-    // 3. Horizontal Bar: Latencia de Motores de Base de Datos (ms)
+    // 3. Horizontal Bar: Database Engine Latency (ms)
     fun generateDatabaseLatencyHorizontalData(): List<Dataset> {
         val items = listOf(
             Pair("Redis", 12f),
@@ -106,20 +104,24 @@ object SampleData {
         }
     }
 
-    // 4. Donut/Pie: Cuota de Mercado de Navegadores Web
+    // 4. Donut/Pie: Web Browser Market Share
     fun generateBrowserSharePieData(): List<Dataset> {
         val entries = listOf(
-            Entry(1f, 52f, "Chrome", color = yellowColor, textColor = whiteColor),
-            Entry(2f, 24f, "Safari", color = blueColor, textColor = whiteColor),
-            Entry(3f, 14f, "Firefox", color = purpleColor, textColor = whiteColor),
-            Entry(4f, 10f, "Edge/Otros", color = coralColor, textColor = whiteColor)
+            Entry(1f, 45f, "Chrome", color = yellowColor),
+            Entry(2f, 22f, "Safari", color = blueColor),
+            Entry(3f, 12f, "Firefox", color = purpleColor),
+            Entry(4f, 7f, "Edge", color = cyanColor),
+            Entry(5f, 5f, "Opera", color = coralColor),
+            Entry(6f, 4f, "Brave", color = emeraldColor),
+            Entry(7f, 3f, "Vivaldi", color = tealColor),
+            Entry(8f, 2f, "Others", color = lightPurpleColor),
         )
         return listOf(Dataset(entries = entries))
     }
 
-    // 5. Stacked Bar: Ingresos por Canal de Venta
+    // 5. Stacked Bar: Revenue by Sales Channel
     fun generateSalesChannelStackedData(): List<StackedBarEntry> {
-        val months = listOf("Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago")
+        val months = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug")
         val colors = listOf(tealColor, coralColor, yellowColor)
 
         return months.mapIndexed { idx, m ->
@@ -127,12 +129,12 @@ object SampleData {
                 x = idx.toFloat(),
                 values = listOf(25f + idx * 3f, 18f + (idx % 4) * 6f, 12f + (idx % 3) * 7f),
                 colors = colors,
-                label = m
+                label = m,
             )
         }
     }
 
-    // 6. Candlestick: Cotización KORA/USD
+    // 6. Candlestick: KORA / USD Daily Candles
     fun generateCryptoCandlestickData(): List<CandlestickEntry> {
         val days = listOf("D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10")
         val opens = listOf(2.10f, 2.45f, 2.30f, 2.80f, 3.10f, 3.65f, 3.40f, 3.90f, 3.75f, 4.20f)
@@ -152,7 +154,7 @@ object SampleData {
         }
     }
 
-    // 7. Radar Data: Habilidades de Desarrollador Mobile
+    // 7. Radar Data: Developer Skill Assessment
     fun generateDeveloperRadarData(): List<RadarDataSet> {
         return listOf(
             RadarDataSet(
@@ -170,9 +172,9 @@ object SampleData {
         )
     }
 
-    // 8. Combined Data: Usuarios Activos vs Conversiones
+    // 8. Combined Data: Active Users vs Conversions
     fun generateTrafficCombinedData(): List<Dataset> {
-        val days = listOf("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
+        val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
         val activeUsers = listOf(45f, 62f, 58f, 80f, 92f, 75f, 68f)
         val conversions = listOf(32f, 48f, 42f, 65f, 78f, 58f, 52f)
 
@@ -180,17 +182,17 @@ object SampleData {
         val lineEntries = days.mapIndexed { idx, d -> Entry(idx.toFloat(), conversions[idx], d) }
 
         return listOf(
-            Dataset(entries = barEntries, label = "Usuarios", color = lightPurpleColor),
+            Dataset(entries = barEntries, label = "Users", color = lightPurpleColor),
             Dataset(
                 entries = lineEntries,
-                label = "Conversiones",
+                label = "Conversions",
                 color = yellowColor,
                 lineWidth = 3f
             ),
         )
     }
 
-    // 9. Bubble Data: Proyectos (Riesgo vs Retorno vs Presupuesto)
+    // 9. Bubble Data: Project Portfolio Matrix
     fun generateProjectRiskBubbleData(): List<BubbleEntry> {
         val projects = listOf("P1", "P2", "P3", "P4", "P5", "P6", "P7")
         val risks = listOf(15f, 28f, 42f, 58f, 68f, 78f, 88f)
@@ -217,21 +219,21 @@ object SampleData {
         }
     }
 
-    // 10. Line Chart: Ingresos Anuales en Miles (€100k a €3.5M)
+    // 10. Line Chart: Annual Revenue in Thousands (€100k to €3.8M)
     fun generateRevenueThousandsLineData(): Pair<List<Dataset>, Entry> {
         val months = listOf(
-            "Ene",
+            "Jan",
             "Feb",
             "Mar",
-            "Abr",
+            "Apr",
             "May",
             "Jun",
             "Jul",
-            "Ago",
+            "Aug",
             "Sep",
             "Oct",
             "Nov",
-            "Dic"
+            "Dec"
         )
         val values =
             listOf(250f, 480f, 750f, 1100f, 1450f, 1800f, 2150f, 2400f, 2850f, 3100f, 3450f, 3800f)
@@ -242,7 +244,7 @@ object SampleData {
 
         val dataset = Dataset(
             entries = entries,
-            label = "Ingresos (€k)",
+            label = "Revenue (€k)",
             color = emeraldColor,
             lineWidth = 2f,
             pointRadius = 3f,

@@ -6,6 +6,7 @@
     <attr name="kora_showAxisLabels" format="boolean" />
     <attr name="kora_isCurved" format="boolean" />
     <attr name="kora_gradientFill" format="boolean" />
+    <attr name="kora_enableZoom" format="boolean" />
     <attr name="kora_animationDuration" format="integer" />
 
     <declare-styleable name="KoraLineChartView">
@@ -15,16 +16,55 @@
         <attr name="kora_showAxisLabels" />
         <attr name="kora_isCurved" />
         <attr name="kora_gradientFill" />
+        <attr name="kora_enableZoom" />
         <attr name="kora_animationDuration" />
     </declare-styleable>
     <declare-styleable name="KoraBarChartView">
         <attr name="kora_showGrid" />
         <attr name="kora_showAxes" />
         <attr name="kora_showAxisLabels" />
+        <attr name="kora_enableZoom" />
+        <attr name="kora_animationDuration" />
+    </declare-styleable>
+    <declare-styleable name="KoraHorizontalBarChartView">
+        <attr name="kora_showAxisLabels" />
+        <attr name="kora_enableZoom" />
         <attr name="kora_animationDuration" />
     </declare-styleable>
     <declare-styleable name="KoraPieChartView">
         <attr name="kora_showAxisLabels" />
         <attr name="kora_animationDuration" />
+    </declare-styleable>
+    <declare-styleable name="KoraStackedBarChartView">
+        <attr name="kora_showGrid" />
+        <attr name="kora_showAxisLabels" />
+        <attr name="kora_enableZoom" />
+        <attr name="kora_animationDuration" />
+    </declare-styleable>
+    <declare-styleable name="KoraCandlestickChartView">
+        <attr name="kora_showGrid" />
+        <attr name="kora_showAxisLabels" />
+        <attr name="kora_enableZoom" />
+        <attr name="kora_animationDuration" />
+    </declare-styleable>
+    <declare-styleable name="KoraRadarChartView">
+        <attr name="kora_animationDuration" />
+    </declare-styleable>
+    <declare-styleable name="KoraCombinedChartView">
+        <attr name="kora_showGrid" />
+        <attr name="kora_showAxisLabels" />
+        <attr name="kora_enableZoom" />
+        <attr name="kora_animationDuration" />
+    </declare-styleable>
+    <declare-styleable name="KoraBubbleChartView">
+        <attr name="kora_showGrid" />
+        <attr name="kora_showAxisLabels" />
+        <attr name="kora_enableZoom" />
+        <attr name="kora_animationDuration" />
+    </declare-styleable>
+    <declare-styleable name="KoraChartCardView">
+        <attr name="kora_cardTitle" format="string" />
+        <attr name="kora_cardSubtitle" format="string" />
+        <attr name="kora_cardBadgeText" format="string" />
     </declare-styleable>
 </resources>

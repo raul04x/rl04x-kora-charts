@@ -1,5 +1,5 @@
-// rl04x-kora-core: engine, renderer, animation system, modelo de datos, touch handling.
-// No depende de Compose ni de Views — es puro Canvas + Android SDK.
+// rl04x-kora-core: engine, renderer, animation system, data model, touch handling.
+// Does not depend on Compose or Views — pure Canvas + Android SDK.
 
 plugins {
     id("kora-android-library")
@@ -16,7 +16,7 @@ dependencies {
     implementation(libs.kotlin.stdlib)
     implementation(libs.coroutines.android)
 
-    // AndroidX mínimo — solo lo que Canvas necesita
+    // Minimal AndroidX — only what Canvas requires
     implementation(libs.androidx.core.ktx)
 
     // Testing
@@ -25,12 +25,12 @@ dependencies {
     androidTestImplementation(libs.espresso)
 }
 
-// Metadata para Maven Central
+// Metadata for Maven Central
 mavenPublishing {
     coordinates(
         groupId    = "io.github.raul04x",
         artifactId = "rl04x-kora-core",
-        version    = "0.1.0-alpha02"
+        version    = libs.versions.kora.get()
     )
     pom {
         name.set("Kora Charts Core")

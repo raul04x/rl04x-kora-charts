@@ -1,5 +1,5 @@
-// rl04x-kora-compose: Composables listos para Jetpack Compose.
-// Depende de rl04x-kora-core; agrega solo el pegamento de Compose.
+// rl04x-kora-compose: Composables ready for Jetpack Compose.
+// Depends on rl04x-kora-core; adds Compose integration.
 
 plugins {
     id("kora-android-library")
@@ -17,15 +17,15 @@ android {
 }
 
 dependencies {
-    // Módulo propio
+    // Internal module
     api(project(":rl04x-kora-core"))
 
-    // Compose BOM — versiones unificadas sin conflictos
+    // Compose BOM — unified versions without conflicts
     val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
     implementation(libs.bundles.compose.ui)
 
-    // Tooling solo en debug — no entra en el AAR de release
+    // Tooling debug-only — excluded from release AAR
     debugImplementation(libs.compose.ui.tooling)
 
     // Testing
@@ -38,7 +38,7 @@ mavenPublishing {
     coordinates(
         groupId    = "io.github.raul04x",
         artifactId = "rl04x-kora-compose",
-        version    = "0.1.0-alpha02"
+        version    = libs.versions.kora.get()
     )
     pom {
         name.set("Kora Charts Compose")

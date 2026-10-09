@@ -1,5 +1,5 @@
-// rl04x-kora-views: Views XML tradicionales (KoraLineChartView, KoraBarChartView…).
-// Para proyectos que todavía no usan Compose o que mezclan ambos sistemas.
+// rl04x-kora-views: Traditional XML Views (KoraLineChartView, KoraBarChartView…).
+// For projects not yet using Compose or mixing both UI systems.
 
 plugins {
     id("kora-android-library")
@@ -11,16 +11,16 @@ android {
     namespace = "com.rl04x.koracharts.views"
 
     buildFeatures {
-        // ViewBinding para los Views internos de la app de sample
+        // ViewBinding for sample app internal Views
         viewBinding = true
     }
 }
 
 dependencies {
-    // Módulo propio
+    // Internal module
     api(project(":rl04x-kora-core"))
 
-    // Material para default styling de tooltips y leyendas
+    // Material for default styling of tooltips and legends
     implementation(libs.material)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
@@ -33,9 +33,9 @@ dependencies {
 
 mavenPublishing {
     coordinates(
-        groupId    = "io.github.raul04x",
+        groupId = "io.github.raul04x",
         artifactId = "rl04x-kora-views",
-        version    = "0.1.0-alpha02"
+        version = libs.versions.kora.get()
     )
     pom {
         name.set("Kora Charts Views")

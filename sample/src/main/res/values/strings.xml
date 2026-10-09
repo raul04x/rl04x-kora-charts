@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kora Charts</string>
+    <string name="title_compose_gallery">Compose Gallery</string>
+    <string name="title_xml_views_gallery">XML Views Gallery</string>
+</resources>

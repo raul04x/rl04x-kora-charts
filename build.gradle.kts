@@ -9,13 +9,13 @@ plugins {
     alias(libs.plugins.maven.publish) apply false
 }
 
-// Task helper: imprime el árbol de módulos del proyecto
+// Task helper: prints the project module tree
 tasks.register("printModuleTree") {
     doLast {
-        println("\n📦 Kora Charts — módulos")
-        println("  :rl04x-kora-core    → Engine, renderer, animation, modelo de datos")
-        println("  :rl04x-kora-compose → Composables para Jetpack Compose")
-        println("  :rl04x-kora-views   → Views XML tradicionales")
-        println("  :sample             → App de demo\n")
+        println("\n📦 Kora Charts — modules")
+        println("  :rl04x-kora-core    → Engine, renderer, animation, data model")
+        println("  :rl04x-kora-compose → Composables for Jetpack Compose")
+        println("  :rl04x-kora-views   → Traditional XML Views")
+        println("  :sample             → Demo app\n")
     }
 }

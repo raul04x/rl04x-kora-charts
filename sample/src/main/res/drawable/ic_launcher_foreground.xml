@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Bar Chart Elements -->
+    <!-- Bar 1: Left Purple Bar -->
+    <path
+        android:pathData="M28,72V52C28,50.3 29.3,49 31,49C32.7,49 34,50.3 34,52V72H28Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="31"
+                android:endY="72"
+                android:startX="31"
+                android:startY="49"
+                android:type="linear">
+                <item android:color="#A78BFA" android:offset="0.0" />
+                <item android:color="#8B5CF6" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Bar 2: Middle Cyan Bar -->
+    <path
+        android:pathData="M40,72V38C40,36.3 41.3,35 43,35C44.7,35 46,36.3 46,38V72H40Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="43"
+                android:endY="72"
+                android:startX="43"
+                android:startY="35"
+                android:type="linear">
+                <item android:color="#2DD4BF" android:offset="0.0" />
+                <item android:color="#14B8A6" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Bar 3: Right Amber Bar -->
+    <path
+        android:pathData="M52,72V44C52,42.3 53.3,41 55,41C56.7,41 58,42.3 58,44V72H52Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="55"
+                android:endY="72"
+                android:startX="55"
+                android:startY="41"
+                android:type="linear">
+                <item android:color="#FCD34D" android:offset="0.0" />
+                <item android:color="#F59E0B" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Baseline Axis -->
+    <path
+        android:pathData="M24,72H84"
+        android:strokeWidth="2.5"
+        android:strokeColor="#334155"
+        android:strokeLineCap="round" />
+
+    <!-- Curved Line Chart -->
+    <path
+        android:pathData="M26,62 C34,56 42,34 50,42 C58,50 68,30 82,34"
+        android:strokeWidth="3.5"
+        android:strokeColor="#38BDF8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Line Gradient Fill Area underneath -->
+    <path
+        android:pathData="M26,62 C34,56 42,34 50,42 C58,50 68,30 82,34 L82,72 L26,72 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="54"
+                android:endY="72"
+                android:startX="54"
+                android:startY="30"
+                android:type="linear">
+                <item android:color="#3038BDF8" android:offset="0.0" />
+                <item android:color="#0038BDF8" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Glowing Nodes on Line Chart -->
+    <!-- Node 1 -->
+    <path
+        android:pathData="M26,62m-3.5,0a3.5,3.5 0 1,0 7,0a3.5,3.5 0 1,0 -7,0"
+        android:fillColor="#38BDF8" />
+    <path
+        android:pathData="M26,62m-1.5,0a1.5,1.5 0 1,0 3,0a1.5,1.5 0 1,0 -3,0"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Node 2 (Peak) -->
+    <path
+        android:pathData="M50,42m-4,0a4,4 0 1,0 8,0a4,4 0 1,0 -8,0"
+        android:fillColor="#38BDF8" />
+    <path
+        android:pathData="M50,42m-1.8,0a1.8,1.8 0 1,0 3.6,0a1.8,1.8 0 1,0 -3.6,0"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Node 3 (Highest Peak) -->
+    <path
+        android:pathData="M82,34m-4,0a4,4 0 1,0 8,0a4,4 0 1,0 -8,0"
+        android:fillColor="#38BDF8" />
+    <path
+        android:pathData="M82,34m-1.8,0a1.8,1.8 0 1,0 3.6,0a1.8,1.8 0 1,0 -3.6,0"
+        android:fillColor="#FFFFFF" />
+
+</vector>
