@@ -111,8 +111,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            app:kora_cardSubtitle="Accumulated breakdown (€)"
-            app:kora_cardTitle="Sales Channels">
+            app:kora_cardSubtitle="Fixed €222/mo · Principal vs Interest"
+            app:kora_cardTitle="French Loan Amortization">
 
             <com.rl04x.koracharts.views.KoraStackedBarChartView
                 android:id="@+id/stackedBarChartView"

@@ -16,7 +16,7 @@ import com.rl04x.koracharts.core.renderer.helper.LegendRenderer
 import java.util.Locale
 
 /**
- * Renderer for Line Charts with Glassmorphic badge overlays, top headroom for capped axes, and zero-allocation drawing loops.
+ * Renderer for Line Charts with Glassmorphic badge overlays, top headroom for capped axes, strict Y-axis clipping, and zero-allocation drawing loops.
  */
 public class LineRenderer : BaseRenderer<Dataset> {
 
@@ -90,7 +90,7 @@ public class LineRenderer : BaseRenderer<Dataset> {
         val leftPadding =
             if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
         val rightPadding =
-            if (hasSecondaryY && config.showAxisLabels) config.paddingDp * density + 32f * density else config.paddingDp * density + 10f * density
+            if (hasSecondaryY && config.showAxisLabels) config.paddingDp * density + 32f * density else config.paddingDp * density + 18f * density
         val bottomPadding = if (config.showAxisLabels) {
             config.paddingDp * density + (if (hasRotatedLabels) 50f * density else 16f * density)
         } else {
@@ -160,11 +160,11 @@ public class LineRenderer : BaseRenderer<Dataset> {
         val maxPanPixels = (drawWidth * effectiveZoomX - drawWidth).coerceAtLeast(0f)
         val clampedPanPixels = config.panOffsetX.coerceIn(0f, maxPanPixels)
 
-        // Plotting area clipping with headroom for top point circles and side padding
+        // Strict plotting area clipping starting at leftPadding to prevent mounting over the Y axis line
         canvas.withClip(
-            leftPadding - 6f * density,
+            leftPadding,
             topPadding,
-            width - rightPadding + 6f * density,
+            width - rightPadding + 4f * density,
             baselineY
         ) {
             for (dataset in visibleDatasets) {
@@ -298,39 +298,25 @@ public class LineRenderer : BaseRenderer<Dataset> {
             }
         }
 
-        // Draw X axis labels
-        if (config.showAxisLabels) {
-            for (idx in firstDataset.entries.indices) {
-                val entry = firstDataset.entries[idx]
-                val pctX = if (entryCount > 1) {
-                    if (range.rangeX > 0f) (entry.x - range.minX) / range.rangeX else idx.toFloat() / (entryCount - 1)
-                } else 0.5f
-                val cx = leftPadding + (pctX * drawWidth * effectiveZoomX) - clampedPanPixels
+        // PASS 2: Drawing X axis labels & vertical grid lines via AxisGridRenderer
+        axisGridRenderer.drawXAxisGridAndLabels(
+            canvas = canvas,
+            config = config,
+            entries = firstDataset.entries,
+            minX = range.minX,
+            maxX = range.maxX,
+            leftPadding = leftPadding,
+            topPadding = topPadding,
+            drawWidth = drawWidth,
+            drawHeight = drawHeight,
+            density = density,
+            topHeadroom = topHeadroom,
+            effectiveZoomX = effectiveZoomX,
+            clampedPanPixels = clampedPanPixels,
+            defaultRotation = defaultRotation,
+        )
 
-                if (cx in (leftPadding - 8f * density)..(width - rightPadding + 8f * density)) {
-                    val rawText = config.xAxisFormatter?.invoke(entry.x)
-                        ?: entry.label?.substringBefore('\n')
-                        ?: String.format(Locale.US, "%.0f", entry.x)
-
-                    val labelText =
-                        if (rawText.length > config.xAxisLabelMaxLen && defaultRotation == 0f) {
-                            rawText.take(config.xAxisLabelMaxLen - 1) + "…"
-                        } else rawText
-
-                    axisGridRenderer.drawXAxisLabel(
-                        canvas = canvas,
-                        label = labelText,
-                        cx = cx,
-                        baselineY = baselineY,
-                        rotationDeg = defaultRotation,
-                        config = config,
-                        density = density,
-                    )
-                }
-            }
-        }
-
-        // Draw Badges
+        // PASS 3: Draw Badges using GlassTooltipRenderer
         for (i in 0 until badgeCount) {
             val badge = badgePool[i]
             glassTooltipRenderer.drawGlassBadge(

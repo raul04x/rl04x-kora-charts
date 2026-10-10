@@ -6,11 +6,12 @@ import androidx.core.graphics.withRotation
 import com.rl04x.koracharts.core.engine.AxisTickCalculator
 import com.rl04x.koracharts.core.engine.TickResult
 import com.rl04x.koracharts.core.model.ChartConfig
+import com.rl04x.koracharts.core.model.Entry
 import java.util.Locale
 
 /**
  * Reusable helper renderer for drawing horizontal/vertical grid lines and axis labels
- * with top headroom support without allocating objects during canvas draw operations.
+ * with Y & X axis nice tick calculations and top headroom support.
  */
 public class AxisGridRenderer {
 
@@ -121,6 +122,128 @@ public class AxisGridRenderer {
         }
 
         return tickResult
+    }
+
+    /**
+     * Draws vertical grid lines and X-axis labels using calculated nice ticks or category entry labels.
+     */
+    public fun drawXAxisGridAndLabels(
+        canvas: Canvas,
+        config: ChartConfig,
+        entries: List<Entry>,
+        minX: Float,
+        maxX: Float,
+        leftPadding: Float,
+        topPadding: Float,
+        drawWidth: Float,
+        drawHeight: Float,
+        density: Float,
+        topHeadroom: Float = 0f,
+        effectiveZoomX: Float = 1f,
+        clampedPanPixels: Float = 0f,
+        defaultRotation: Float = 0f,
+    ) {
+        if (!config.showAxisLabels && !config.showVerticalGrid) return
+
+        gridPaint.color = config.style.gridColor
+        val baselineY = topPadding + topHeadroom + drawHeight
+        val rangeX = (maxX - minX).coerceAtLeast(1f)
+        val hasCategoryLabels = entries.any { !it.label.isNullOrEmpty() }
+
+        if (config.useNiceTicks && !hasCategoryLabels && rangeX > 1f) {
+            val xTickResult = AxisTickCalculator.computeNiceTicks(
+                min = minX,
+                max = maxX,
+                targetTicks = 4,
+                customStep = config.xAxisStep,
+                forceInteger = config.forceIntegerTicks,
+                capAtMax = false,
+            )
+
+            for (xVal in xTickResult.ticks) {
+                val pctX = (xVal - minX) / rangeX
+                val cx = leftPadding + (pctX * drawWidth * effectiveZoomX) - clampedPanPixels
+
+                if (cx in (leftPadding - 8f * density)..(leftPadding + drawWidth + 8f * density)) {
+                    if (config.showVerticalGrid) {
+                        canvas.drawLine(cx, topPadding + topHeadroom, cx, baselineY, gridPaint)
+                    }
+                    if (config.showAxisLabels) {
+                        val rawText = config.xAxisFormatter?.invoke(xVal)
+                            ?: if (config.forceIntegerTicks) String.format(
+                                Locale.US,
+                                "%.0f",
+                                xVal
+                            ) else String.format(Locale.US, "%.1f", xVal)
+                        drawXAxisLabel(
+                            canvas,
+                            rawText,
+                            cx,
+                            baselineY,
+                            defaultRotation,
+                            config,
+                            density
+                        )
+                    }
+                }
+            }
+        } else {
+            val entryCount = entries.size
+            if (entryCount == 0) return
+
+            labelPaint.textSize = 10f * density
+            var sampleStride = 1
+            if (entryCount > 1 && defaultRotation == 0f) {
+                val rawSampleText = config.xAxisFormatter?.invoke(entries.first().x)
+                    ?: entries.first().label?.substringBefore('\n')
+                    ?: "Day 00"
+                val sampleText = if (rawSampleText.length > config.xAxisLabelMaxLen) {
+                    rawSampleText.take(config.xAxisLabelMaxLen)
+                } else rawSampleText
+
+                val textWidth = labelPaint.measureText(sampleText) + 14f * density
+                val maxVisibleLabels =
+                    ((drawWidth * effectiveZoomX) / textWidth).toInt().coerceAtLeast(1)
+                sampleStride = (entryCount / maxVisibleLabels).coerceAtLeast(1)
+            }
+
+            val startPos = if (sampleStride > 1) sampleStride else 1
+            for (pos in startPos..entryCount step sampleStride) {
+                val idx = pos - 1
+                val entry = entries[idx]
+                val pctX = if (entryCount > 1) {
+                    if (rangeX > 0f) (entry.x - minX) / rangeX else idx.toFloat() / (entryCount - 1)
+                } else 0.5f
+
+                val cx = leftPadding + (pctX * drawWidth * effectiveZoomX) - clampedPanPixels
+
+                if (cx in (leftPadding - 8f * density)..(leftPadding + drawWidth + 8f * density)) {
+                    if (config.showVerticalGrid) {
+                        canvas.drawLine(cx, topPadding + topHeadroom, cx, baselineY, gridPaint)
+                    }
+                    if (config.showAxisLabels) {
+                        val rawText = config.xAxisFormatter?.invoke(entry.x)
+                            ?: entry.label?.substringBefore('\n')
+                            ?: String.format(Locale.US, "%.0f", entry.x)
+
+                        val labelText =
+                            if (rawText.length > config.xAxisLabelMaxLen && defaultRotation == 0f) {
+                                rawText.take(config.xAxisLabelMaxLen - 1) + "…"
+                            } else rawText
+
+                        drawXAxisLabel(
+                            canvas,
+                            labelText,
+                            cx,
+                            baselineY,
+                            defaultRotation,
+                            config,
+                            density
+                        )
+                    }
+                }
+            }
+        }
     }
 
     /**

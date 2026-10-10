@@ -16,7 +16,8 @@ import java.util.Locale
 
 /**
  * Renderer for Stacked Bar Charts supporting top-only rounded corners, segment value labels,
- * multi-row word-wrap legend bar, 2D Zoom & Pan gestures, crosshairs, and Glassmorphic badge tooltips with multi-line (\n) support.
+ * multi-row word-wrap legend bar, 2D Zoom & Pan gestures, crosshairs, smart X-axis label sampling/niceTicks (up to 480+ entries),
+ * 100% aligned column touches and labels, and Glass badge tooltips with multi-line (\n) support.
  */
 public class StackedBarRenderer : BaseRenderer<StackedBarEntry> {
 
@@ -25,6 +26,14 @@ public class StackedBarRenderer : BaseRenderer<StackedBarEntry> {
     private val glassTooltipRenderer = GlassTooltipRenderer()
 
     private val segmentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        strokeWidth = 1f
+        style = Paint.Style.STROKE
+    }
+    private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 10f
+        textAlign = Paint.Align.CENTER
+    }
     private val segmentValuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textSize = 9f
@@ -55,6 +64,8 @@ public class StackedBarRenderer : BaseRenderer<StackedBarEntry> {
         if (data.isEmpty() || width <= 0f || height <= 0f) return
 
         val density = Resources.getSystem().displayMetrics.density
+        gridPaint.color = config.style.gridColor
+        labelPaint.color = config.style.labelTextColor
         segmentValuePaint.textSize = 9f * density
         totalValuePaint.color = config.style.titleTextColor
         totalValuePaint.textSize = 10f * density
@@ -147,6 +158,7 @@ public class StackedBarRenderer : BaseRenderer<StackedBarEntry> {
         var selectedTooltipX = 0f
         var selectedTooltipY = 0f
 
+        // PASS 1: Draw stacked bars clipped to plotting area
         canvas.withClip(
             leftPadding - 4f * density,
             topPadding,
@@ -165,7 +177,6 @@ public class StackedBarRenderer : BaseRenderer<StackedBarEntry> {
                 val totalTopY =
                     (baselineY - barHeight).coerceIn(topPadding + topHeadroom, baselineY)
 
-                var currentBottomY = baselineY
                 val cornerRadius = 6f * density
 
                 clipPath.reset()
@@ -175,42 +186,52 @@ public class StackedBarRenderer : BaseRenderer<StackedBarEntry> {
                     floatArrayOf(
                         cornerRadius, cornerRadius,
                         cornerRadius, cornerRadius,
-                        0f, 0f, 0f, 0f
+                        0f, 0f,
+                        0f, 0f
                     ),
                     Path.Direction.CW
                 )
 
                 canvas.withClip(clipPath) {
+                    var cumulativeY = 0f
+
                     for ((vIdx, valItem) in entry.values.withIndex()) {
-                        val color = entry.colors.getOrElse(vIdx) { 0xFF888888.toInt() }
-                        val segmentPct = (valItem / effectiveValRange).coerceAtLeast(0f)
-                        val segmentHeight = segmentPct * drawHeight * progress
-                        val segmentTopY = currentBottomY - segmentHeight
+                        val segBottomDataY = cumulativeY
+                        val segTopDataY = cumulativeY + (valItem * progress)
+                        cumulativeY += valItem
 
-                        segmentPaint.color = color
-                        canvas.drawRect(
-                            barLeft,
-                            segmentTopY,
-                            barRight,
-                            currentBottomY,
-                            segmentPaint
-                        )
+                        val segBottomScreenY =
+                            (topPadding + topHeadroom + (1f - (segBottomDataY - effectiveMinY) / effectiveValRange) * drawHeight)
+                                .coerceIn(topPadding + topHeadroom, baselineY)
+                        val segTopScreenY =
+                            (topPadding + topHeadroom + (1f - (segTopDataY - effectiveMinY) / effectiveValRange) * drawHeight)
+                                .coerceIn(topPadding + topHeadroom, baselineY)
 
-                        if (segmentHeight > 14f * density && config.showPointValues) {
-                            val segmentText = if (valItem == valItem.toLong().toFloat()) {
-                                String.format(Locale.US, "%.0f", valItem)
-                            } else {
-                                String.format(Locale.US, "%.1f", valItem)
-                            }
-                            canvas.drawText(
-                                segmentText,
-                                cx,
-                                segmentTopY + (segmentHeight / 2f) + 3f * density,
-                                segmentValuePaint
+                        if (segBottomScreenY > segTopScreenY) {
+                            segmentPaint.color = entry.colors.getOrElse(vIdx) { 0xFF888888.toInt() }
+                            canvas.drawRect(
+                                barLeft,
+                                segTopScreenY,
+                                barRight,
+                                segBottomScreenY,
+                                segmentPaint
                             )
-                        }
 
-                        currentBottomY = segmentTopY
+                            val segmentHeight = segBottomScreenY - segTopScreenY
+                            if (segmentHeight > 14f * density && config.showPointValues) {
+                                val segmentText = if (valItem == valItem.toLong().toFloat()) {
+                                    String.format(Locale.US, "%.0f", valItem)
+                                } else {
+                                    String.format(Locale.US, "%.1f", valItem)
+                                }
+                                canvas.drawText(
+                                    segmentText,
+                                    cx,
+                                    segTopScreenY + (segmentHeight / 2f) + 3f * density,
+                                    segmentValuePaint
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -272,31 +293,64 @@ public class StackedBarRenderer : BaseRenderer<StackedBarEntry> {
             }
         }
 
-        // Draw X axis labels
-        if (config.showAxisLabels) {
+        // PASS 2: Draw X axis labels aligned to multiples of sampleStride (15, 30, 45, 60 or 6, 12, 18, 24, 30)
+        if (config.showAxisLabels || config.showVerticalGrid) {
             val defaultRotation = if (hasRotatedLabels) {
                 if (config.xAxisLabelRotation != 0f) config.xAxisLabelRotation else -45f
             } else 0f
 
-            for ((idx, entry) in data.withIndex()) {
+            labelPaint.textSize = 10f * density
+            var sampleStride = 1
+            if (count > 1 && defaultRotation == 0f) {
+                val rawSampleText = config.xAxisFormatter?.invoke(data.first().x)
+                    ?: data.first().label?.substringBefore('\n')
+                    ?: "Month 00"
+                val sampleText = if (rawSampleText.length > config.xAxisLabelMaxLen) {
+                    rawSampleText.take(config.xAxisLabelMaxLen)
+                } else rawSampleText
+
+                val textWidth = labelPaint.measureText(sampleText) + 14f * density
+                val maxVisibleLabels =
+                    ((drawWidth * effectiveZoomX) / textWidth).toInt().coerceAtLeast(1)
+                sampleStride = (count / maxVisibleLabels).coerceAtLeast(1)
+            }
+
+            val startPos = if (sampleStride > 1) sampleStride else 1
+            for (pos in startPos..count step sampleStride) {
+                val idx = pos - 1
+                val entry = data[idx]
                 val cx =
                     leftPadding + (idx * scaledSlotWidth) + (scaledSlotWidth / 2f) - clampedPanPixels
-                if (cx in (leftPadding - 8f * density)..(width - rightPadding + 8f * density)) {
-                    val label = entry.label ?: String.format(Locale.US, "%.0f", entry.x)
-                    axisGridRenderer.drawXAxisLabel(
-                        canvas = canvas,
-                        label = label,
-                        cx = cx,
-                        baselineY = baselineY,
-                        rotationDeg = defaultRotation,
-                        config = config,
-                        density = density,
-                    )
+
+                if (cx in (leftPadding - 8f * density)..(leftPadding + drawWidth + 8f * density)) {
+                    if (config.showVerticalGrid) {
+                        canvas.drawLine(cx, topPadding + topHeadroom, cx, baselineY, gridPaint)
+                    }
+                    if (config.showAxisLabels) {
+                        val rawText = config.xAxisFormatter?.invoke(entry.x)
+                            ?: entry.label?.substringBefore('\n')
+                            ?: String.format(Locale.US, "%.0f", entry.x)
+
+                        val labelText =
+                            if (rawText.length > config.xAxisLabelMaxLen && defaultRotation == 0f) {
+                                rawText.take(config.xAxisLabelMaxLen - 1) + "…"
+                            } else rawText
+
+                        axisGridRenderer.drawXAxisLabel(
+                            canvas = canvas,
+                            label = labelText,
+                            cx = cx,
+                            baselineY = baselineY,
+                            rotationDeg = defaultRotation,
+                            config = config,
+                            density = density,
+                        )
+                    }
                 }
             }
         }
 
-        // Draw selected tooltip badge on top of everything
+        // PASS 3: Draw selected tooltip badge on top of everything
         selectedTooltipText?.let { tooltipText ->
             glassTooltipRenderer.drawGlassBadge(
                 canvas = canvas,

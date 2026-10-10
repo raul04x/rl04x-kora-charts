@@ -8,6 +8,7 @@ import com.rl04x.koracharts.core.model.Dataset
 import com.rl04x.koracharts.core.model.Entry
 import com.rl04x.koracharts.core.model.RadarDataSet
 import com.rl04x.koracharts.core.model.StackedBarEntry
+import kotlin.math.pow
 
 object SampleData {
 
@@ -20,24 +21,33 @@ object SampleData {
     val emeraldColor = "#10B981".toColorInt()
     val blueColor = "#3B82F6".toColorInt()
 
-    // 1. Line Chart: Expenses Comparison
+    // 1. Line Chart: Expenses Comparison (Full 30 Days of Month)
     fun generateMonthlyExpensesLineData(): Pair<List<Dataset>, Entry> {
-        val days = listOf("Day 1", "Day 5", "Day 10", "Day 15", "Day 20", "Day 25", "Day 30")
-        val currentMonthValues = listOf(120f, 340f, 580f, 820f, 1146f, 1420f, 1750f)
-        val previousMonthValues = listOf(150f, 410f, 690f, 980f, 1310f, 1650f, 1920f)
+        val currentMonthValues = listOf(
+            120f, 150f, 190f, 240f, 300f, 350f, 410f, 480f, 530f, 590f,
+            640f, 700f, 760f, 830f, 890f, 960f, 1020f, 1080f, 1150f, 1220f,
+            1290f, 1360f, 1420f, 1490f, 1560f, 1630f, 1700f, 1760f, 1810f, 1880f
+        )
+        val previousMonthValues = listOf(
+            140f, 180f, 230f, 290f, 360f, 420f, 490f, 560f, 620f, 690f,
+            750f, 820f, 890f, 960f, 1030f, 1100f, 1180f, 1250f, 1320f, 1400f,
+            1470f, 1550f, 1620f, 1700f, 1780f, 1850f, 1920f, 1990f, 2050f, 2120f
+        )
 
-        val currentEntries = days.mapIndexed { idx, d ->
+        val currentEntries = (1..30).map { day ->
+            val valCurr = currentMonthValues[day - 1]
             Entry(
-                idx.toFloat() * 5f + 1f,
-                currentMonthValues[idx],
-                "$d\nExpenses: €${currentMonthValues[idx].toInt()}\nStatus: On Track"
+                x = day.toFloat(),
+                y = valCurr,
+                label = "Day $day\nExpenses: €${valCurr.toInt()}\nStatus: On Track"
             )
         }
-        val previousEntries = days.mapIndexed { idx, d ->
+        val previousEntries = (1..30).map { day ->
+            val valPrev = previousMonthValues[day - 1]
             Entry(
-                idx.toFloat() * 5f + 1f,
-                previousMonthValues[idx],
-                "$d\nPrevious: €${previousMonthValues[idx].toInt()}"
+                x = day.toFloat(),
+                y = valPrev,
+                label = "Day $day\nPrevious: €${valPrev.toInt()}"
             )
         }
 
@@ -46,7 +56,7 @@ object SampleData {
             label = "Current Month",
             color = tealColor,
             lineWidth = 2f,
-            pointRadius = 3f,
+            pointRadius = 2.5f,
             fillAlpha = 0.22f,
             isCurved = true,
             gradientFill = true,
@@ -59,13 +69,13 @@ object SampleData {
             label = "Previous Month",
             color = "#818CF8".toColorInt(),
             lineWidth = 1.8f,
-            pointRadius = 2.5f,
+            pointRadius = 2f,
             fillAlpha = 0.08f,
             isCurved = true,
             gradientFill = false,
         )
 
-        return Pair(listOf(currentDataset, previousDataset), currentEntries[4])
+        return Pair(listOf(currentDataset, previousDataset), currentEntries[19]) // Day 20 selected
     }
 
     // 2. Bar Chart: Product Sales
@@ -125,43 +135,50 @@ object SampleData {
 
     fun generateBrowserSharePieData(): List<Dataset> = generateMarketSharePieData()
 
-    // 5. Stacked Bar Data: 8 Months with 5 Regional Segments
-    fun generateQuarterlyRevenueStackedData(): List<StackedBarEntry> {
-        val colors = listOf(tealColor, purpleColor, yellowColor, coralColor, blueColor)
-        val segmentLabels = listOf(
-            "North America",
-            "Europe",
-            "Asia Pacific",
-            "Latin America",
-            "Middle East & Africa"
-        )
+    // 5. Stacked Bar Data: French Amortization Method Credit (60 Months - Fixed Payment, Decreasing Interest, Increasing Principal)
+    fun generateFrenchAmortization60MonthsData(): List<StackedBarEntry> {
+        val loanAmount = 10000f
+        val monthlyRate = 0.01f // 12% annual rate / 12 = 1% monthly
+        val monthsCount = 60
 
-        val months = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug")
-        val matrixValues = listOf(
-            listOf(25f, 30f, 15f, 10f, 8f),
-            listOf(28f, 32f, 18f, 12f, 10f),
-            listOf(32f, 38f, 22f, 15f, 11f),
-            listOf(30f, 35f, 20f, 14f, 9f),
-            listOf(36f, 42f, 25f, 18f, 12f),
-            listOf(40f, 45f, 28f, 20f, 14f),
-            listOf(38f, 40f, 26f, 17f, 13f),
-            listOf(44f, 48f, 32f, 22f, 16f),
-        )
+        // Fixed monthly payment formula: A = V * (i * (1+i)^n) / ((1+i)^n - 1)
+        val rateFactor = (1.01).pow(60.0).toFloat()
+        val monthlyPayment = loanAmount * (monthlyRate * rateFactor) / (rateFactor - 1f)
 
-        return months.mapIndexed { idx, monthName ->
-            StackedBarEntry(
-                x = idx.toFloat(),
-                values = matrixValues[idx],
-                colors = colors,
-                label = monthName,
-                textColors = null,
-                segmentLabels = segmentLabels,
+        var remainingBalance = loanAmount
+        val colors = listOf(
+            emeraldColor,
+            coralColor
+        ) // Principal Repayment (Emerald Green), Interest Payment (Coral Red)
+        val segmentLabels = listOf("Principal Repayment", "Interest Payment")
+
+        val entries = mutableListOf<StackedBarEntry>()
+
+        for (month in 1..monthsCount) {
+            val interestPayment = remainingBalance * monthlyRate
+            val principalPayment = (monthlyPayment - interestPayment).coerceAtLeast(0f)
+            remainingBalance = (remainingBalance - principalPayment).coerceAtLeast(0f)
+
+            entries.add(
+                StackedBarEntry(
+                    x = month.toFloat(),
+                    values = listOf(principalPayment, interestPayment),
+                    colors = colors,
+                    label = "Month $month",
+                    textColors = null,
+                    segmentLabels = segmentLabels,
+                )
             )
         }
+
+        return entries
     }
 
+    fun generateQuarterlyRevenueStackedData(): List<StackedBarEntry> =
+        generateFrenchAmortization60MonthsData()
+
     fun generateSalesChannelStackedData(): List<StackedBarEntry> =
-        generateQuarterlyRevenueStackedData()
+        generateFrenchAmortization60MonthsData()
 
     // 6. Candlestick Data
     fun generateFinancialCandlestickData(): List<CandlestickEntry> {

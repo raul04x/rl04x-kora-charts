@@ -120,7 +120,7 @@ public class KoraStackedBarChartView @JvmOverloads constructor(
                     val density = resources.displayMetrics.density
                     val leftPadding =
                         if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
-                    val rightPadding = config.paddingDp * density
+                    val rightPadding = config.paddingDp * density + 10f * density
                     val drawWidth = width.toFloat() - leftPadding - rightPadding
 
                     val maxPanX = (drawWidth * config.zoomScaleX - drawWidth).coerceAtLeast(0f)
