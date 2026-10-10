@@ -4,7 +4,7 @@ import androidx.core.graphics.toColorInt
 
 /**
  * Theme and styling configuration for Kora Charts.
- * Supports Light, Dark (Midnight), Deep Dark (OLED), and custom color configurations.
+ * Supports Light, Dark (Midnight), Deep Dark (OLED), and custom color configurations with glassmorphism presets.
  */
 public data class KoraChartStyle(
     val cardBackgroundColor: Int = "#0F172A".toColorInt(),
@@ -16,7 +16,7 @@ public data class KoraChartStyle(
     val subtitleTextColor: Int = "#64748B".toColorInt(),
     val badgeBackgroundColor: Int = "#1E1B4B".toColorInt(),
     val badgeTextColor: Int = "#818CF8".toColorInt(),
-    val tooltipBackgroundColor: Int = "#1E293B".toColorInt(),
+    val tooltipBackgroundColor: Int = "#D91E293B".toColorInt(),
     val tooltipBorderColor: Int = "#38BDF8".toColorInt(),
     val tooltipTextColor: Int = "#FFFFFF".toColorInt(),
     val highlightLineColor: Int = "#38BDF8".toColorInt(),
@@ -34,7 +34,7 @@ public data class KoraChartStyle(
             subtitleTextColor = "#64748B".toColorInt(),
             badgeBackgroundColor = "#1E1B4B".toColorInt(),
             badgeTextColor = "#818CF8".toColorInt(),
-            tooltipBackgroundColor = "#1E293B".toColorInt(),
+            tooltipBackgroundColor = "#D91E293B".toColorInt(),
             tooltipBorderColor = "#38BDF8".toColorInt(),
             tooltipTextColor = "#FFFFFF".toColorInt(),
             highlightLineColor = "#38BDF8".toColorInt(),
@@ -52,7 +52,7 @@ public data class KoraChartStyle(
             subtitleTextColor = "#7AA2F7".toColorInt(),
             badgeBackgroundColor = "#172E2B".toColorInt(),
             badgeTextColor = "#2DD4BF".toColorInt(),
-            tooltipBackgroundColor = "#1A1B26".toColorInt(),
+            tooltipBackgroundColor = "#D91A1B26".toColorInt(),
             tooltipBorderColor = "#2DD4BF".toColorInt(),
             tooltipTextColor = "#FFFFFF".toColorInt(),
             highlightLineColor = "#2DD4BF".toColorInt(),
@@ -70,7 +70,7 @@ public data class KoraChartStyle(
             subtitleTextColor = "#94A3B8".toColorInt(),
             badgeBackgroundColor = "#D1FAE5".toColorInt(),
             badgeTextColor = "#059669".toColorInt(),
-            tooltipBackgroundColor = "#0F172A".toColorInt(),
+            tooltipBackgroundColor = "#E60F172A".toColorInt(),
             tooltipBorderColor = "#334155".toColorInt(),
             tooltipTextColor = "#FFFFFF".toColorInt(),
             highlightLineColor = "#14B8A6".toColorInt(),

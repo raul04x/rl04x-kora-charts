@@ -11,6 +11,7 @@ import com.rl04x.koracharts.core.engine.ChartEngine
 import com.rl04x.koracharts.core.model.ChartConfig
 import com.rl04x.koracharts.core.model.Dataset
 import com.rl04x.koracharts.core.renderer.BarRenderer
+import kotlin.math.abs
 
 /**
  * Custom Android View for rendering Kora Bar Charts in XML layouts.
@@ -65,7 +66,19 @@ public class KoraBarChartView @JvmOverloads constructor(
     ) {
         this.datasets = data
         this.config = newConfig
+        updateAccessibilityDescription()
         startAnimation()
+    }
+
+    private fun updateAccessibilityDescription() {
+        val allEntries = datasets.flatMap { it.entries }
+        contentDescription = if (allEntries.isEmpty()) {
+            "Bar chart with no data"
+        } else {
+            val minVal = allEntries.minOf { it.y }
+            val maxVal = allEntries.maxOf { it.y }
+            "Bar chart with ${allEntries.size} items. Minimum $minVal, Maximum $maxVal."
+        }
     }
 
     private fun startAnimation() {
@@ -135,8 +148,8 @@ public class KoraBarChartView @JvmOverloads constructor(
                     }
                 }
 
-                val absDx = Math.abs(dx)
-                val absDy = Math.abs(dy)
+                val absDx = abs(dx)
+                val absDy = abs(dy)
                 if (!isDraggingChart && absDx > touchSlop && absDx > absDy * 1.2f) {
                     isDraggingChart = true
                     parent?.requestDisallowInterceptTouchEvent(true)
@@ -168,10 +181,10 @@ public class KoraBarChartView @JvmOverloads constructor(
                 if (clickedIdx in 0 until entryCount) {
                     val clickedBar = visibleDatasets.first().entries.getOrNull(clickedIdx)
                     if (clickedBar != null) {
-                        if (config.selectedEntry == clickedBar) {
-                            config = config.copy(selectedEntry = null)
+                        config = if (config.selectedEntry == clickedBar) {
+                            config.copy(selectedEntry = null)
                         } else {
-                            config = config.copy(selectedEntry = clickedBar)
+                            config.copy(selectedEntry = clickedBar)
                         }
                         performClick()
                         invalidate()

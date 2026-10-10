@@ -7,17 +7,15 @@ import android.graphics.RectF
 import androidx.core.graphics.toColorInt
 import com.rl04x.koracharts.core.model.CandlestickEntry
 import com.rl04x.koracharts.core.model.ChartConfig
+import com.rl04x.koracharts.core.renderer.helper.AxisGridRenderer
 import java.util.Locale
 
 /**
- * Renderer for financial Candlestick charts.
+ * Renderer for financial Candlestick charts with zero allocations in draw().
  */
 public class CandlestickRenderer : BaseRenderer<CandlestickEntry> {
 
-    private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        strokeWidth = 1f
-        style = Paint.Style.STROKE
-    }
+    private val axisGridRenderer = AxisGridRenderer()
 
     private val wickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         strokeWidth = 2f
@@ -28,13 +26,10 @@ public class CandlestickRenderer : BaseRenderer<CandlestickEntry> {
         style = Paint.Style.FILL
     }
 
-    private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = 10f
-        textAlign = Paint.Align.CENTER
-    }
+    private val bullColor = "#10B981".toColorInt()
+    private val bearColor = "#EF4444".toColorInt()
 
-    private val bullColor = "#10B981".toColorInt() // Bullish green
-    private val bearColor = "#EF4444".toColorInt() // Bearish red
+    private val cachedBodyRect = RectF()
 
     override fun draw(
         canvas: Canvas,
@@ -47,9 +42,6 @@ public class CandlestickRenderer : BaseRenderer<CandlestickEntry> {
         if (data.isEmpty() || width <= 0f || height <= 0f) return
 
         val density = Resources.getSystem().displayMetrics.density
-        gridPaint.color = config.style.gridColor
-        labelPaint.color = config.style.labelTextColor
-        labelPaint.textSize = 8f * density
 
         val leftPadding =
             if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
@@ -65,62 +57,23 @@ public class CandlestickRenderer : BaseRenderer<CandlestickEntry> {
         val baselineY = topPadding + drawHeight
         val minVal = data.minOf { it.low }
         val maxVal = data.maxOf { it.high }
-        val valRange = (maxVal - minVal).coerceAtLeast(1f)
 
-        val yTickResult = if (config.useNiceTicks) {
-            com.rl04x.koracharts.core.engine.AxisTickCalculator.computeNiceTicks(
-                min = minVal,
-                max = maxVal,
-                targetTicks = 4,
-                customStep = config.yAxisStep,
-                forceInteger = config.forceIntegerTicks,
-                capAtMax = config.capNiceTicksAtMax,
-            )
-        } else null
+        val tickResult = axisGridRenderer.drawYAxisGridAndLabels(
+            canvas = canvas,
+            config = config,
+            minVal = minVal,
+            maxVal = maxVal,
+            leftPadding = leftPadding,
+            topPadding = topPadding,
+            rightPadding = rightPadding,
+            drawWidth = drawWidth,
+            drawHeight = drawHeight,
+            density = density,
+        )
 
-        val effectiveMinVal = yTickResult?.niceMin ?: minVal
-        val effectiveMaxVal = yTickResult?.niceMax ?: maxVal
+        val effectiveMinVal = tickResult?.niceMin ?: minVal
+        val effectiveMaxVal = tickResult?.niceMax ?: maxVal
         val effectiveValRange = (effectiveMaxVal - effectiveMinVal).coerceAtLeast(1f)
-
-        // Draw horizontal grid lines
-        if (config.showGrid) {
-            if (yTickResult != null) {
-                for (yVal in yTickResult.ticks) {
-                    val pct = (yVal - effectiveMinVal) / effectiveValRange
-                    val y = topPadding + (1f - pct) * drawHeight
-                    if (y in (topPadding - 1f)..(baselineY + 1f)) {
-                        canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
-                        if (config.showAxisLabels) {
-                            val labelText = config.yAxisFormatter?.invoke(yVal)
-                                ?: if (config.forceIntegerTicks) String.format(
-                                    Locale.US,
-                                    "%.0f",
-                                    yVal
-                                ) else String.format(Locale.US, "%.1f", yVal)
-                            canvas.drawText(
-                                labelText,
-                                leftPadding - 6f * density,
-                                y + 4f * density,
-                                labelPaint.apply { textAlign = Paint.Align.RIGHT })
-                        }
-                    }
-                }
-            } else {
-                val steps = 4
-                for (i in 0..steps) {
-                    val y = topPadding + (drawHeight * (i.toFloat() / steps))
-                    canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
-                    if (config.showAxisLabels) {
-                        val yVal = maxVal - (valRange * (i.toFloat() / steps))
-                        canvas.drawText(
-                            String.format(Locale.US, "%.0f", yVal),
-                            leftPadding - 6f * density,
-                            y + 4f * density,
-                            labelPaint.apply { textAlign = Paint.Align.RIGHT })
-                    }
-                }
-            }
-        }
 
         val count = data.size
         val slotWidth = drawWidth / count
@@ -143,26 +96,28 @@ public class CandlestickRenderer : BaseRenderer<CandlestickEntry> {
             val openY = toY(entry.open)
             val closeY = toY(entry.close)
 
-            // Draw wick
             canvas.drawLine(cx, highY, cx, lowY, wickPaint)
 
-            // Draw body
             val topBody = minOf(openY, closeY)
             val bottomBody = maxOf(openY, closeY)
             val bodyHeight = (bottomBody - topBody).coerceAtLeast(2f * density)
 
             val left = cx - (candleWidth / 2f)
             val right = cx + (candleWidth / 2f)
-            val bodyRect = RectF(left, topBody, right, topBody + bodyHeight * progress)
-            canvas.drawRoundRect(bodyRect, 2f * density, 2f * density, candlePaint)
+            cachedBodyRect.set(left, topBody, right, topBody + bodyHeight * progress)
+            canvas.drawRoundRect(cachedBodyRect, 2f * density, 2f * density, candlePaint)
 
             if (config.showAxisLabels) {
                 val labelText = entry.label ?: String.format(Locale.US, "%.0f", entry.x)
-                canvas.drawText(
-                    labelText,
-                    cx,
-                    baselineY + 14f * density,
-                    labelPaint.apply { textAlign = Paint.Align.CENTER })
+                axisGridRenderer.drawXAxisLabel(
+                    canvas = canvas,
+                    label = labelText,
+                    cx = cx,
+                    baselineY = baselineY,
+                    rotationDeg = config.xAxisLabelRotation,
+                    config = config,
+                    density = density,
+                )
             }
         }
     }

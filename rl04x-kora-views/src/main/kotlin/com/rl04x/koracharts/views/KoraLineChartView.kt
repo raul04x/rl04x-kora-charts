@@ -11,6 +11,7 @@ import com.rl04x.koracharts.core.engine.ChartEngine
 import com.rl04x.koracharts.core.model.ChartConfig
 import com.rl04x.koracharts.core.model.Dataset
 import com.rl04x.koracharts.core.renderer.LineRenderer
+import kotlin.math.abs
 
 /**
  * Custom Android View for rendering Kora Line Charts in XML layouts.
@@ -129,14 +130,21 @@ public class KoraLineChartView @JvmOverloads constructor(
 
                 if (config.enableZoom && (config.zoomScaleX > 1.05f || config.zoomScaleY > 1.05f)) {
                     val density = resources.displayMetrics.density
-                    val padding = config.paddingDp * density
-                    val engine = ChartEngine(width.toFloat(), height.toFloat(), padding)
-                    val range = engine.computeRange(datasets)
+                    val hasSecondaryY =
+                        config.showSecondaryYAxis || datasets.any { it.useSecondaryAxis }
+                    val leftPadding =
+                        if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
+                    val rightPadding =
+                        if (hasSecondaryY && config.showAxisLabels) config.paddingDp * density + 32f * density else config.paddingDp * density + 10f * density
+                    val drawWidth = (width.toFloat() - leftPadding - rightPadding).coerceAtLeast(1f)
 
-                    val visibleRangeX = range.rangeX / config.zoomScaleX
-                    val maxPanX = (range.rangeX - visibleRangeX).coerceAtLeast(0f)
-                    val deltaDataX = -dx / width.toFloat() * visibleRangeX
-                    val newPanX = (config.panOffsetX + deltaDataX).coerceIn(0f, maxPanX)
+                    val maxPanXPixels =
+                        (drawWidth * config.zoomScaleX - drawWidth).coerceAtLeast(0f)
+                    val newPanX = (config.panOffsetX - dx).coerceIn(0f, maxPanXPixels)
+
+                    val engine =
+                        ChartEngine(width.toFloat(), height.toFloat(), config.paddingDp * density)
+                    val range = engine.computeRange(datasets)
 
                     val visibleRangeY = range.rangeY / config.zoomScaleY
                     val maxPanY = (range.rangeY - visibleRangeY).coerceAtLeast(0f)
@@ -153,8 +161,8 @@ public class KoraLineChartView @JvmOverloads constructor(
                     }
                 }
 
-                val absDx = Math.abs(dx)
-                val absDy = Math.abs(dy)
+                val absDx = abs(dx)
+                val absDy = abs(dy)
                 if (!isDraggingChart && absDx > touchSlop && absDx > absDy * 1.2f) {
                     isDraggingChart = true
                     parent?.requestDisallowInterceptTouchEvent(true)
@@ -172,10 +180,8 @@ public class KoraLineChartView @JvmOverloads constructor(
 
         if (datasets.isNotEmpty() && width > 0 && height > 0 && event.actionMasked == MotionEvent.ACTION_UP && !isDraggingChart) {
             val density = resources.displayMetrics.density
-            val padding = config.paddingDp * density
-            val engine = ChartEngine(width.toFloat(), height.toFloat(), padding)
-            val range = engine.computeRange(datasets)
-            val nearest = engine.nearestEntry(event.x, event.y, datasets, range)
+            val engine = ChartEngine(width.toFloat(), height.toFloat(), config.paddingDp * density)
+            val nearest = engine.nearestLineEntry(event.x, event.y, datasets, config, density)
             if (nearest != null) {
                 if (config.selectedEntry == nearest) {
                     config = config.copy(selectedEntry = null)

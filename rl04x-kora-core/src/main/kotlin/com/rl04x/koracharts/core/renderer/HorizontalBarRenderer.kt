@@ -4,6 +4,7 @@ import android.content.res.Resources
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
+import androidx.core.graphics.toColorInt
 import com.rl04x.koracharts.core.model.ChartConfig
 import com.rl04x.koracharts.core.model.Dataset
 import java.util.Locale
@@ -13,28 +14,34 @@ import java.util.Locale
  */
 public class HorizontalBarRenderer : BaseRenderer<Dataset> {
 
-    private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-    }
+    private val trackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val labelPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 11f; textAlign = Paint.Align.LEFT }
+    private val valuePaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 11f; textAlign = Paint.Align.RIGHT }
 
-    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-    }
+    private val cachedTrackRect = RectF()
+    private val cachedFillRect = RectF()
 
-    private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = 12f
-        textAlign = Paint.Align.LEFT
-    }
+    private class HorizontalItem(
+        var label: String = "",
+        var value: Float = 0f,
+        var color: Int = 0,
+    )
 
-    private val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = 11f
-        textAlign = Paint.Align.RIGHT
-    }
+    private val itemPool =
+        ArrayList<HorizontalItem>(32).apply { repeat(32) { add(HorizontalItem()) } }
+    private var itemCount = 0
 
-    private data class HorizontalItem(
-        val label: String,
-        val value: Float,
-        val color: Int,
+    private val defaultColors = listOf(
+        "#F87171".toColorInt(), // Coral (Redis)
+        "#F59E0B".toColorInt(), // Amber (DynamoDB)
+        "#3B82F6".toColorInt(), // Blue (PostgreSQL)
+        "#8B5CF6".toColorInt(), // Purple (Cassandra)
+        "#10B981".toColorInt(), // Emerald (MongoDB)
+        "#2DD4BF".toColorInt(), // Cyan (Elasticsearch)
+        "#14B8A6".toColorInt(), // Teal
     )
 
     override fun draw(
@@ -55,21 +62,38 @@ public class HorizontalBarRenderer : BaseRenderer<Dataset> {
         labelPaint.color = config.style.labelTextColor
         valuePaint.color = config.style.labelTextColor
 
-        // Extract items from multiple Datasets or a single Dataset with multiple entries
-        val items = mutableListOf<HorizontalItem>()
+        itemCount = 0
+
         if (data.size > 1) {
-            for (dataset in data) {
+            for ((_, dataset) in data.withIndex()) {
                 val entry = dataset.entries.firstOrNull() ?: continue
-                items.add(HorizontalItem(entry.label ?: dataset.label, entry.y, dataset.color))
+                val label = entry.label ?: dataset.label
+                val color = entry.color ?: dataset.color
+                if (itemCount < itemPool.size) {
+                    val item = itemPool[itemCount]
+                    item.label = label; item.value = entry.y; item.color = color
+                } else {
+                    itemPool.add(HorizontalItem(label, entry.y, color))
+                }
+                itemCount++
             }
         } else if (data.isNotEmpty()) {
             val dataset = data.first()
-            for (entry in dataset.entries) {
-                items.add(HorizontalItem(entry.label ?: dataset.label, entry.y, dataset.color))
+            for ((idx, entry) in dataset.entries.withIndex()) {
+                val label = entry.label ?: dataset.label
+                val color = entry.color ?: dataset.color.takeIf { it != 0 }
+                ?: defaultColors[idx % defaultColors.size]
+                if (itemCount < itemPool.size) {
+                    val item = itemPool[itemCount]
+                    item.label = label; item.value = entry.y; item.color = color
+                } else {
+                    itemPool.add(HorizontalItem(label, entry.y, color))
+                }
+                itemCount++
             }
         }
 
-        if (items.isEmpty()) return
+        if (itemCount == 0) return
 
         val leftMargin = 90f * density
         val rightMargin = 48f * density
@@ -79,32 +103,31 @@ public class HorizontalBarRenderer : BaseRenderer<Dataset> {
         val drawHeight = height - topPadding - bottomPadding
         if (drawWidth <= 0f || drawHeight <= 0f) return
 
-        val itemCount = items.size
         val slotHeight = drawHeight / itemCount
         val barHeight = (slotHeight * 0.45f).coerceIn(6f * density, 20f * density)
-        val maxY = items.maxOfOrNull { it.value }?.coerceAtLeast(1f) ?: 100f
+        var maxVal = 1f
+        for (i in 0 until itemCount) {
+            if (itemPool[i].value > maxVal) maxVal = itemPool[i].value
+        }
 
-        for ((idx, item) in items.withIndex()) {
-            val centerY = topPadding + (idx * slotHeight) + (slotHeight / 2f)
+        for (i in 0 until itemCount) {
+            val item = itemPool[i]
+            val centerY = topPadding + (i * slotHeight) + (slotHeight / 2f)
             val barTop = centerY - (barHeight / 2f)
             val barBottom = centerY + (barHeight / 2f)
 
-            // Category label on left
             canvas.drawText(item.label, 8f * density, centerY + 4f * density, labelPaint)
 
-            // Background track
-            val trackRect = RectF(leftMargin, barTop, leftMargin + drawWidth, barBottom)
-            canvas.drawRoundRect(trackRect, barHeight / 2f, barHeight / 2f, trackPaint)
+            cachedTrackRect.set(leftMargin, barTop, leftMargin + drawWidth, barBottom)
+            canvas.drawRoundRect(cachedTrackRect, barHeight / 2f, barHeight / 2f, trackPaint)
 
-            // Animated progress bar
-            val fillWidth = (item.value / maxY) * drawWidth * progress
+            val fillWidth = (item.value / maxVal) * drawWidth * progress
             if (fillWidth > 0f) {
                 fillPaint.color = item.color
-                val fillRect = RectF(leftMargin, barTop, leftMargin + fillWidth, barBottom)
-                canvas.drawRoundRect(fillRect, barHeight / 2f, barHeight / 2f, fillPaint)
+                cachedFillRect.set(leftMargin, barTop, leftMargin + fillWidth, barBottom)
+                canvas.drawRoundRect(cachedFillRect, barHeight / 2f, barHeight / 2f, fillPaint)
             }
 
-            // Value text on right (ms)
             val valueText = String.format(Locale.US, "%.0fms", item.value)
             canvas.drawText(valueText, width - 8f * density, centerY + 4f * density, valuePaint)
         }

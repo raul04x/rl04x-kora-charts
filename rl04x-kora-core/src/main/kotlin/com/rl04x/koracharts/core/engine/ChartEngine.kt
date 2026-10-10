@@ -1,5 +1,6 @@
 package com.rl04x.koracharts.core.engine
 
+import com.rl04x.koracharts.core.model.ChartConfig
 import com.rl04x.koracharts.core.model.Dataset
 import com.rl04x.koracharts.core.model.Entry
 import kotlin.math.atan2
@@ -18,7 +19,7 @@ public class ChartEngine(
     private val viewHeight: Float,
     private val paddingPx: Float = 48f,
 ) {
-    private val drawWidth  get() = (viewWidth  - (paddingPx * 2))
+    private val drawWidth get() = (viewWidth - (paddingPx * 2))
     private val drawHeight get() = (viewHeight - (paddingPx * 2))
 
     /**
@@ -122,14 +123,119 @@ public class ChartEngine(
     ): Entry? {
         var nearest: Entry? = null
         var minDist = Float.MAX_VALUE
-        for (ds in datasets) {
-            for (entry in ds.entries) {
+        for ((entries) in datasets) {
+            for (entry in entries) {
                 val ex = toScreenX(entry.x, range, zoomScaleX, panOffsetX)
                 val ey = toScreenY(entry.y, range, zoomScaleY, panOffsetY)
                 val dist = (screenX - ex) * (screenX - ex) + (screenY - ey) * (screenY - ey)
-                if (dist < minDist) { minDist = dist; nearest = entry }
+                if (dist < minDist) {
+                    minDist = dist; nearest = entry
+                }
             }
         }
+        return nearest
+    }
+
+    /**
+     * Finds the nearest [Entry] to a screen coordinate for Line Charts,
+     * taking into account exact line renderer padding, 2D Zoom & Pan pixel offsets.
+     */
+    public fun nearestLineEntry(
+        screenX: Float,
+        screenY: Float,
+        datasets: List<Dataset>,
+        config: ChartConfig,
+        density: Float,
+    ): Entry? {
+        val visibleDatasets = datasets.filter { it.visible && it.entries.isNotEmpty() }
+        if (visibleDatasets.isEmpty()) return null
+
+        val firstDataset = visibleDatasets.first()
+        val entryCount = firstDataset.entries.size
+        if (entryCount == 0) return null
+
+        val range = computeRange(visibleDatasets)
+        val hasSecondaryY = config.showSecondaryYAxis || datasets.any { it.useSecondaryAxis }
+        val hasLegend = config.showLegend && datasets.any { it.label.isNotEmpty() }
+
+        val hasRotatedLabels = config.showAxisLabels && (
+                config.xAxisLabelRotation != 0f || firstDataset.entries.any {
+                    (it.label?.substringBefore('\n')?.length ?: 0) > 8
+                }
+                )
+
+        val leftPadding =
+            if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
+        val rightPadding =
+            if (hasSecondaryY && config.showAxisLabels) config.paddingDp * density + 32f * density else config.paddingDp * density + 10f * density
+        val bottomPadding = if (config.showAxisLabels) {
+            config.paddingDp * density + (if (hasRotatedLabels) 50f * density else 16f * density)
+        } else {
+            config.paddingDp * density
+        }
+
+        val legendLabels = if (hasLegend) datasets.filter { it.visible && it.label.isNotEmpty() }
+            .map { it.label } else emptyList()
+        val legendRenderer = com.rl04x.koracharts.core.renderer.helper.LegendRenderer()
+        val legendHeight = if (hasLegend) legendRenderer.calculateLegendHeight(
+            legendLabels,
+            viewWidth - leftPadding - rightPadding,
+            density
+        ) else 0f
+        val topPadding = config.paddingDp * density + legendHeight + 10f * density
+
+        val drawWidth = (viewWidth - leftPadding - rightPadding).coerceAtLeast(1f)
+        val drawHeight = (viewHeight - topPadding - bottomPadding).coerceAtLeast(1f)
+
+        val effectiveZoomX = maxOf(1f, config.zoomScaleX)
+        val maxPanPixels = (drawWidth * effectiveZoomX - drawWidth).coerceAtLeast(0f)
+        val clampedPanPixels = config.panOffsetX.coerceIn(0f, maxPanPixels)
+
+        val visibleZoomY = maxOf(1f, config.zoomScaleY)
+        val visibleRangeY = if (visibleZoomY == 1f) range.rangeY else range.rangeY / visibleZoomY
+        val maxPanY = (range.rangeY - visibleRangeY).coerceAtLeast(0f)
+        val clampedPanY = config.panOffsetY.coerceIn(0f, maxPanY)
+        val visibleMinY = range.minY + clampedPanY
+        val visibleMaxY = visibleMinY + visibleRangeY
+
+        val tickResult = if (config.useNiceTicks) {
+            AxisTickCalculator.computeNiceTicks(
+                min = visibleMinY,
+                max = visibleMaxY,
+                targetTicks = 4,
+                customStep = config.yAxisStep,
+                forceInteger = config.forceIntegerTicks,
+                capAtMax = config.capNiceTicksAtMax,
+            )
+        } else null
+
+        val effectiveMinY = tickResult?.niceMin ?: visibleMinY
+        val effectiveMaxY = tickResult?.niceMax ?: visibleMaxY
+        val effectiveRangeY = (effectiveMaxY - effectiveMinY).coerceAtLeast(1f)
+
+        var nearest: Entry? = null
+        var minDist = Float.MAX_VALUE
+
+        for ((entries) in visibleDatasets) {
+            val dsEntryCount = entries.size
+            for (idx in entries.indices) {
+                val entry = entries[idx]
+                val pctX = if (dsEntryCount > 1) {
+                    if (range.rangeX > 0f) (entry.x - range.minX) / range.rangeX else idx.toFloat() / (dsEntryCount - 1)
+                } else 0.5f
+
+                val ex = leftPadding + (pctX * drawWidth * effectiveZoomX) - clampedPanPixels
+                val pctY = (entry.y - effectiveMinY) / effectiveRangeY
+                val ey = (topPadding + drawHeight) - (pctY * drawHeight)
+
+                val dist = (screenX - ex) * (screenX - ex) + (screenY - ey) * (screenY - ey)
+                if (dist < minDist) {
+                    minDist = dist
+                    nearest = entry
+                }
+            }
+        }
+
         return nearest
     }
 
@@ -140,7 +246,6 @@ public class ChartEngine(
         screenX: Float,
         screenY: Float,
         datasets: List<Dataset>,
-        holeRadiusRatio: Float = 0.55f,
         density: Float = 1f,
     ): Entry? {
         val entries = datasets.firstOrNull()?.entries ?: return null

@@ -19,6 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import com.rl04x.koracharts.core.model.BubbleEntry
 import com.rl04x.koracharts.core.model.CandlestickEntry
 import com.rl04x.koracharts.core.model.ChartConfig
@@ -53,7 +57,17 @@ public fun KoraHorizontalBarChart(
         )
     }
 
-    Canvas(modifier = modifier) {
+    val semanticsSummary = remember(datasets) {
+        val entries = datasets.flatMap { it.entries }
+        "Horizontal bar chart with ${entries.size} bars."
+    }
+
+    Canvas(
+        modifier = modifier.semantics {
+            contentDescription = semanticsSummary
+            role = Role.Image
+        }
+    ) {
         drawIntoCanvas { canvas ->
             renderer.draw(
                 canvas = canvas.nativeCanvas,
@@ -68,7 +82,7 @@ public fun KoraHorizontalBarChart(
 }
 
 /**
- * Stacked Bar Chart composable supporting touch selection, labels, and 2D Zoom & Pan gestures.
+ * Stacked Bar Chart composable supporting touch selection, labels, accessibility, and 2D Zoom & Pan gestures.
  */
 @Composable
 public fun KoraStackedBarChart(
@@ -124,7 +138,14 @@ public fun KoraStackedBarChart(
             )
         }
 
-    Box(modifier = modifier) {
+    val semanticsSummary = remember(entries) {
+        "Stacked bar chart with ${entries.size} columns."
+    }
+
+    Box(modifier = modifier.semantics {
+        contentDescription = semanticsSummary
+        role = Role.Image
+    }) {
         Canvas(
             modifier = Modifier
                 .matchParentSize()
@@ -146,7 +167,6 @@ public fun KoraStackedBarChart(
                             if (clickedIdx in 0 until entryCount) {
                                 val tapped = entries[clickedIdx]
                                 if (selectedBar == tapped) {
-                                    // Tapping same bar closes tooltip
                                     selectedBar = null
                                     onBarSelected?.invoke(null)
                                 } else {
@@ -154,7 +174,6 @@ public fun KoraStackedBarChart(
                                     onBarSelected?.invoke(tapped)
                                 }
                             } else {
-                                // Tapping outside closes tooltip
                                 selectedBar = null
                                 onBarSelected?.invoke(null)
                             }
@@ -268,7 +287,16 @@ public fun KoraCandlestickChart(
         )
     }
 
-    Canvas(modifier = modifier) {
+    val semanticsSummary = remember(candles) {
+        "Financial candlestick chart with ${candles.size} candles."
+    }
+
+    Canvas(
+        modifier = modifier.semantics {
+            contentDescription = semanticsSummary
+            role = Role.Image
+        }
+    ) {
         drawIntoCanvas { canvas ->
             renderer.draw(
                 canvas = canvas.nativeCanvas,
@@ -302,7 +330,16 @@ public fun KoraRadarChart(
         )
     }
 
-    Canvas(modifier = modifier) {
+    val semanticsSummary = remember(datasets) {
+        "Radar chart with ${datasets.size} polygons."
+    }
+
+    Canvas(
+        modifier = modifier.semantics {
+            contentDescription = semanticsSummary
+            role = Role.Image
+        }
+    ) {
         drawIntoCanvas { canvas ->
             renderer.draw(
                 canvas = canvas.nativeCanvas,
@@ -336,7 +373,16 @@ public fun KoraCombinedChart(
         )
     }
 
-    Canvas(modifier = modifier) {
+    val semanticsSummary = remember(datasets) {
+        "Combined bar and line chart with ${datasets.size} series."
+    }
+
+    Canvas(
+        modifier = modifier.semantics {
+            contentDescription = semanticsSummary
+            role = Role.Image
+        }
+    ) {
         drawIntoCanvas { canvas ->
             renderer.draw(
                 canvas = canvas.nativeCanvas,
@@ -370,7 +416,16 @@ public fun KoraBubbleChart(
         )
     }
 
-    Canvas(modifier = modifier) {
+    val semanticsSummary = remember(bubbles) {
+        "Bubble scatter plot with ${bubbles.size} items."
+    }
+
+    Canvas(
+        modifier = modifier.semantics {
+            contentDescription = semanticsSummary
+            role = Role.Image
+        }
+    ) {
         drawIntoCanvas { canvas ->
             renderer.draw(
                 canvas = canvas.nativeCanvas,

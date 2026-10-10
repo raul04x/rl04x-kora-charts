@@ -4,8 +4,10 @@ import android.content.res.Resources
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RectF
 import com.rl04x.koracharts.core.model.ChartConfig
 import com.rl04x.koracharts.core.model.Dataset
+import com.rl04x.koracharts.core.renderer.helper.AxisGridRenderer
 import java.util.Locale
 
 /**
@@ -13,10 +15,7 @@ import java.util.Locale
  */
 public class CombinedRenderer : BaseRenderer<Dataset> {
 
-    private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        strokeWidth = 1f
-        style = Paint.Style.STROKE
-    }
+    private val axisGridRenderer = AxisGridRenderer()
 
     private val barPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
@@ -33,10 +32,12 @@ public class CombinedRenderer : BaseRenderer<Dataset> {
         style = Paint.Style.FILL
     }
 
-    private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = 10f
-        textAlign = Paint.Align.CENTER
+    private val innerNodePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
     }
+
+    private val cachedBarRect = RectF()
+    private val linePath = Path()
 
     override fun draw(
         canvas: Canvas,
@@ -49,9 +50,6 @@ public class CombinedRenderer : BaseRenderer<Dataset> {
         if (data.size < 2 || width <= 0f || height <= 0f) return
 
         val density = Resources.getSystem().displayMetrics.density
-        gridPaint.color = config.style.gridColor
-        labelPaint.color = config.style.labelTextColor
-        labelPaint.textSize = 10f * density
 
         val leftPadding =
             if (config.showAxisLabels) config.paddingDp * density + 24f * density else config.paddingDp * density
@@ -76,58 +74,20 @@ public class CombinedRenderer : BaseRenderer<Dataset> {
             lineDataset.entries.maxOfOrNull { it.y } ?: 100f,
         ).coerceAtLeast(1f)
 
-        val yTickResult = if (config.useNiceTicks) {
-            com.rl04x.koracharts.core.engine.AxisTickCalculator.computeNiceTicks(
-                min = 0f,
-                max = maxVal,
-                targetTicks = 4,
-                customStep = config.yAxisStep,
-                forceInteger = config.forceIntegerTicks,
-                capAtMax = config.capNiceTicksAtMax,
-            )
-        } else null
+        val tickResult = axisGridRenderer.drawYAxisGridAndLabels(
+            canvas = canvas,
+            config = config,
+            minVal = 0f,
+            maxVal = maxVal,
+            leftPadding = leftPadding,
+            topPadding = topPadding,
+            rightPadding = rightPadding,
+            drawWidth = drawWidth,
+            drawHeight = drawHeight,
+            density = density,
+        )
 
-        val effectiveMaxVal = yTickResult?.niceMax ?: maxVal
-
-        // Draw horizontal grid lines
-        if (config.showGrid) {
-            if (yTickResult != null) {
-                for (yVal in yTickResult.ticks) {
-                    val pct = yVal / effectiveMaxVal
-                    val y = topPadding + (1f - pct) * drawHeight
-                    if (y in (topPadding - 1f)..(baselineY + 1f)) {
-                        canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
-                        if (config.showAxisLabels) {
-                            val labelText = config.yAxisFormatter?.invoke(yVal)
-                                ?: if (config.forceIntegerTicks) String.format(
-                                    Locale.US,
-                                    "%.0f",
-                                    yVal
-                                ) else String.format(Locale.US, "%.1f", yVal)
-                            canvas.drawText(
-                                labelText,
-                                leftPadding - 6f * density,
-                                y + 4f * density,
-                                labelPaint.apply { textAlign = Paint.Align.RIGHT })
-                        }
-                    }
-                }
-            } else {
-                val steps = 4
-                for (i in 0..steps) {
-                    val y = topPadding + (drawHeight * (i.toFloat() / steps))
-                    canvas.drawLine(leftPadding, y, width - rightPadding, y, gridPaint)
-                    if (config.showAxisLabels) {
-                        val yVal = maxVal * (1f - (i.toFloat() / steps))
-                        canvas.drawText(
-                            String.format(Locale.US, "%.0f", yVal),
-                            leftPadding - 6f * density,
-                            y + 4f * density,
-                            labelPaint.apply { textAlign = Paint.Align.RIGHT })
-                    }
-                }
-            }
-        }
+        val effectiveMaxVal = tickResult?.niceMax ?: maxVal
 
         val slotWidth = drawWidth / entryCount
         val barWidth = slotWidth * 0.45f
@@ -141,23 +101,20 @@ public class CombinedRenderer : BaseRenderer<Dataset> {
             val barHeight = (entry.y / effectiveMaxVal) * drawHeight * progress
             val barTop = baselineY - barHeight
 
-            canvas.drawRoundRect(
-                barLeft,
-                barTop,
-                barRight,
-                baselineY,
-                6f * density,
-                6f * density,
-                barPaint
-            )
+            cachedBarRect.set(barLeft, barTop, barRight, baselineY)
+            canvas.drawRoundRect(cachedBarRect, 6f * density, 6f * density, barPaint)
 
             if (config.showAxisLabels) {
                 val labelText = entry.label ?: String.format(Locale.US, "%.0f", entry.x)
-                canvas.drawText(
-                    labelText,
-                    cx,
-                    baselineY + 14f * density,
-                    labelPaint.apply { textAlign = Paint.Align.CENTER })
+                axisGridRenderer.drawXAxisLabel(
+                    canvas = canvas,
+                    label = labelText,
+                    cx = cx,
+                    baselineY = baselineY,
+                    rotationDeg = config.xAxisLabelRotation,
+                    config = config,
+                    density = density,
+                )
             }
         }
 
@@ -165,14 +122,16 @@ public class CombinedRenderer : BaseRenderer<Dataset> {
         linePaint.color = lineDataset.color
         linePaint.strokeWidth = lineDataset.lineWidth * density
         nodePaint.color = lineDataset.color
+        innerNodePaint.color = config.style.cardBackgroundColor
 
-        val linePath = Path()
-        val linePoints = mutableListOf<Pair<Float, Float>>()
+        linePath.reset()
+        val linePoints = FloatArray(lineDataset.entries.size * 2)
 
         for ((idx, entry) in lineDataset.entries.withIndex()) {
             val cx = leftPadding + (idx * slotWidth) + (slotWidth / 2f)
             val lineY = baselineY - ((entry.y / effectiveMaxVal) * drawHeight * progress)
-            linePoints.add(Pair(cx, lineY))
+            linePoints[idx * 2] = cx
+            linePoints[idx * 2 + 1] = lineY
 
             if (idx == 0) linePath.moveTo(cx, lineY) else linePath.lineTo(cx, lineY)
         }
@@ -180,13 +139,11 @@ public class CombinedRenderer : BaseRenderer<Dataset> {
         canvas.drawPath(linePath, linePaint)
 
         // Draw node dots
-        for (pt in linePoints) {
-            canvas.drawCircle(pt.first, pt.second, 5f * density, nodePaint)
-            canvas.drawCircle(
-                pt.first,
-                pt.second,
-                2.5f * density,
-                Paint(Paint.ANTI_ALIAS_FLAG).apply { color = config.style.cardBackgroundColor })
+        for (idx in lineDataset.entries.indices) {
+            val px = linePoints[idx * 2]
+            val py = linePoints[idx * 2 + 1]
+            canvas.drawCircle(px, py, 5f * density, nodePaint)
+            canvas.drawCircle(px, py, 2.5f * density, innerNodePaint)
         }
     }
 }
