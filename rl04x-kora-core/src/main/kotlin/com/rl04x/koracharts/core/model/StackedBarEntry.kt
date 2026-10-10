@@ -9,4 +9,5 @@ public data class StackedBarEntry(
     val colors: List<Int>,
     val label: String? = null,
     val textColors: List<Int>? = null,
+    val segmentLabels: List<String>? = null,
 )

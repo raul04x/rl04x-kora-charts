@@ -80,10 +80,6 @@ public class LineRenderer : BaseRenderer<Dataset> {
         style = Paint.Style.STROKE
     }
 
-    private val glassShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-    }
-
     private val badgeTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textSize = 10f
@@ -117,11 +113,11 @@ public class LineRenderer : BaseRenderer<Dataset> {
 
         val density = Resources.getSystem().displayMetrics.density
         labelPaint.textSize = 10f * density
-        badgeTextPaint.textSize = 10f * density
+        badgeTextPaint.textSize = 8f * density
 
         val hasRotatedLabels =
             config.showAxisLabels && (config.xAxisLabelRotation != 0f || data.firstOrNull()?.entries?.any {
-                (it.label?.length ?: 0) > 8
+                (it.label?.substringBefore('\n')?.length ?: 0) > 8
             } == true)
         val hasSecondaryY = config.showSecondaryYAxis || data.any { it.useSecondaryAxis }
         val hasLegend = config.showLegend && data.any { it.label.isNotEmpty() }
@@ -129,14 +125,14 @@ public class LineRenderer : BaseRenderer<Dataset> {
         val leftPadding =
             if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
         val rightPadding =
-            if (hasSecondaryY && config.showAxisLabels) config.paddingDp * density + 32f * density else config.paddingDp * density
+            if (hasSecondaryY && config.showAxisLabels) config.paddingDp * density + 32f * density else config.paddingDp * density + 10f * density
         val bottomPadding = if (config.showAxisLabels) {
-            config.paddingDp * density + (if (hasRotatedLabels) 60f * density else 20f * density)
+            config.paddingDp * density + (if (hasRotatedLabels) 50f * density else 16f * density)
         } else {
             config.paddingDp * density
         }
         val topPadding =
-            config.paddingDp * density + (if (hasLegend) 24f * density else 16f * density)
+            config.paddingDp * density + (if (hasLegend) 22f * density else 12f * density)
 
         val drawWidth = width - leftPadding - rightPadding
         val drawHeight = height - topPadding - bottomPadding
@@ -193,6 +189,7 @@ public class LineRenderer : BaseRenderer<Dataset> {
                 targetTicks = 4,
                 customStep = config.yAxisStep,
                 forceInteger = config.forceIntegerTicks,
+                capAtMax = config.capNiceTicksAtMax,
             )
         } else null
 
@@ -417,6 +414,7 @@ public class LineRenderer : BaseRenderer<Dataset> {
                             targetTicks = 4,
                             customStep = config.yAxisStep,
                             forceInteger = config.forceIntegerTicks,
+                            capAtMax = config.capNiceTicksAtMax,
                         )
                     } else null
 
@@ -484,10 +482,10 @@ public class LineRenderer : BaseRenderer<Dataset> {
 
         // PASS 1: Plotting lines and node dots (clipped to chart area)
         canvas.withClip(
-            leftPadding,
-            topPadding - 4f * density,
-            width - rightPadding,
-            baselineY + 2f * density
+            leftPadding - 12f * density,
+            topPadding - 16f * density,
+            width - rightPadding + 16f * density,
+            baselineY + 8f * density
         ) {
             for (dataset in data) {
                 if (!dataset.visible || dataset.entries.isEmpty()) continue
@@ -589,8 +587,8 @@ public class LineRenderer : BaseRenderer<Dataset> {
 
                         if ((config.showPointValues || isSelected) && progress >= 0.5f) {
                             val valueText = config.pointValueFormatter?.invoke(entry)
-                                ?: (entry.label?.let { "$it: ${entry.y}" }
-                                    ?: String.format(Locale.US, "%.1f", entry.y))
+                                ?: entry.label
+                                ?: formatYValue(entry.y, config.yAxisFormatter)
 
                             pendingBadges.add(
                                 GlassBadgeItem(
@@ -646,7 +644,7 @@ public class LineRenderer : BaseRenderer<Dataset> {
                             val matchedEntry =
                                 firstDataset.entries.firstOrNull { kotlin.math.abs(it.x - xVal) < 0.001f }
                             val rawText = config.xAxisFormatter?.invoke(xVal)
-                                ?: matchedEntry?.label
+                                ?: matchedEntry?.label?.substringBefore('\n')
                                 ?: if (config.forceIntegerTicks) String.format(
                                     Locale.US,
                                     "%.0f",
@@ -696,8 +694,9 @@ public class LineRenderer : BaseRenderer<Dataset> {
                         })
 
                         if (sx in leftPadding..width - rightPadding) {
-                            val rawText = config.xAxisFormatter?.invoke(entry.x) ?: entry.label
-                            ?: String.format(Locale.US, "%.0f", entry.x)
+                            val rawText = config.xAxisFormatter?.invoke(entry.x)
+                                ?: entry.label?.substringBefore('\n')
+                                ?: String.format(Locale.US, "%.0f", entry.x)
                             val rotation = when {
                                 config.xAxisLabelRotation != 0f -> config.xAxisLabelRotation
                                 rawText.length > 8 -> -90f
@@ -732,19 +731,34 @@ public class LineRenderer : BaseRenderer<Dataset> {
         }
 
         // PASS 3: Draw Glassmorphic Badges on top of everything
+        val cornerPx = config.tooltipCornerRadiusDp * density
         for (badge in pendingBadges) {
-            badgeTextPaint.getTextBounds(badge.text, 0, badge.text.length, textBoundsRect)
-            val textWidth = badgeTextPaint.measureText(badge.text)
-            val textHeight = textBoundsRect.height().toFloat()
+            val lines = badge.text.split("\n")
+            badgeTextPaint.color = config.style.tooltipTextColor
+            badgeTextPaint.textSize = 8f * density
+            badgeTextPaint.textAlign = Paint.Align.CENTER
 
-            val paddingX = 8f * density
-            val paddingY = 5f * density
+            var maxTextWidth = 0f
+            val lineSpacing = 16f * density
 
-            val badgeWidth = textWidth + (paddingX * 2f)
-            val badgeHeight = textHeight + (paddingY * 2f)
+            for (line in lines) {
+                badgeTextPaint.getTextBounds(line, 0, line.length, textBoundsRect)
+                val w = badgeTextPaint.measureText(line)
+                if (w > maxTextWidth) maxTextWidth = w
+            }
+            val totalTextHeight = lines.size * lineSpacing
 
-            val cx = badge.x
-            val cy = badge.y - 24f * density
+            val paddingX = config.tooltipPaddingXDp * density
+            val paddingY = config.tooltipPaddingYDp * density
+
+            val badgeWidth = maxTextWidth + (paddingX * 2f)
+            val badgeHeight = totalTextHeight + (paddingY * 2f)
+
+            val cx = badge.x.coerceIn(
+                leftPadding + badgeWidth / 2f,
+                width - rightPadding - badgeWidth / 2f
+            )
+            val cy = (badge.y - 28f * density).coerceAtLeast(topPadding + badgeHeight / 2f)
 
             val badgeRect = RectF(
                 cx - (badgeWidth / 2f),
@@ -753,25 +767,22 @@ public class LineRenderer : BaseRenderer<Dataset> {
                 cy + (badgeHeight / 2f),
             )
 
-            val shadowRect = RectF(
-                badgeRect.left,
-                badgeRect.top + 2f * density,
-                badgeRect.right,
-                badgeRect.bottom + 2f * density
-            )
-            glassShadowPaint.color =
-                Color.argb((0.25f * 255 * progress).toInt().coerceIn(0, 255), 0, 0, 0)
-            canvas.drawRoundRect(shadowRect, 7f * density, 7f * density, glassShadowPaint)
-
             glassBgPaint.color = config.style.tooltipBackgroundColor
-            glassBorderPaint.strokeWidth = 1.2f * density
-            glassBorderPaint.color = config.style.tooltipBorderColor
+            canvas.drawRoundRect(badgeRect, cornerPx, cornerPx, glassBgPaint)
 
-            canvas.drawRoundRect(badgeRect, 7f * density, 7f * density, glassBgPaint)
-            canvas.drawRoundRect(badgeRect, 7f * density, 7f * density, glassBorderPaint)
+            if (config.showTooltipBorder) {
+                glassBorderPaint.strokeWidth = 1f * density
+                glassBorderPaint.color = config.style.tooltipBorderColor
+                canvas.drawRoundRect(badgeRect, cornerPx, cornerPx, glassBorderPaint)
+            }
 
-            val textY = cy + (textHeight / 2f) - 1.5f * density
-            canvas.drawText(badge.text, cx, textY, badgeTextPaint)
+            val totalLines = lines.size
+            val fontCapHeight = 12f * density * 0.7f
+            var startY = cy - ((totalLines - 1) * lineSpacing) / 2f + (fontCapHeight / 3.5f)
+            for (line in lines) {
+                canvas.drawText(line, cx, startY, badgeTextPaint)
+                startY += lineSpacing
+            }
         }
     }
 }

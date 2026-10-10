@@ -45,4 +45,9 @@ public data class ChartConfig(
     val averageLineColor: Int? = null,
     val showSecondaryYAxis: Boolean = false,
     val secondaryYAxisFormatter: ((Float) -> String)? = null,
+    val capNiceTicksAtMax: Boolean = true,
+    val showTooltipBorder: Boolean = true,
+    val tooltipCornerRadiusDp: Float = 8f,
+    val tooltipPaddingXDp: Float = 8f,
+    val tooltipPaddingYDp: Float = 4f,
 )

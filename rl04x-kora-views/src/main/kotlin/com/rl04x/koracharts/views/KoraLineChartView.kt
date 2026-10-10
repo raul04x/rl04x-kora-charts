@@ -170,15 +170,19 @@ public class KoraLineChartView @JvmOverloads constructor(
             }
         }
 
-        if (datasets.isNotEmpty() && width > 0 && height > 0) {
+        if (datasets.isNotEmpty() && width > 0 && height > 0 && event.actionMasked == MotionEvent.ACTION_UP && !isDraggingChart) {
             val density = resources.displayMetrics.density
             val padding = config.paddingDp * density
             val engine = ChartEngine(width.toFloat(), height.toFloat(), padding)
             val range = engine.computeRange(datasets)
             val nearest = engine.nearestEntry(event.x, event.y, datasets, range)
-            if (nearest != null && nearest != config.selectedEntry) {
-                config = config.copy(selectedEntry = nearest)
-                onPointSelectedListener?.invoke(nearest.x, nearest.y)
+            if (nearest != null) {
+                if (config.selectedEntry == nearest) {
+                    config = config.copy(selectedEntry = null)
+                } else {
+                    config = config.copy(selectedEntry = nearest)
+                    onPointSelectedListener?.invoke(nearest.x, nearest.y)
+                }
                 performClick()
                 invalidate()
             }

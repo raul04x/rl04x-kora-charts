@@ -64,6 +64,7 @@ public object AxisTickCalculator {
      * @param targetTicks Target number of tick divisions (default 4).
      * @param customStep Optional manual override step size (e.g., 5f, 100f).
      * @param forceInteger If true, guarantees step and ticks are rounded whole numbers.
+     * @param capAtMax If true, caps the upper axis bound and final tick at [max] to eliminate empty canvas space.
      */
     public fun computeNiceTicks(
         min: Float,
@@ -71,30 +72,50 @@ public object AxisTickCalculator {
         targetTicks: Int = 4,
         customStep: Float? = null,
         forceInteger: Boolean = true,
+        capAtMax: Boolean = true
     ): TickResult {
-        val effectiveMin = min
         var effectiveMax = max
-        if (effectiveMin >= effectiveMax) {
-            effectiveMax = effectiveMin + 1f
+        if (min >= effectiveMax) {
+            effectiveMax = min + 1f
         }
 
-        val range = effectiveMax - effectiveMin
+        val range = effectiveMax - min
         val step = if (customStep != null && customStep > 0f) {
             if (forceInteger) maxOf(1f, round(customStep)) else customStep
         } else {
             computeNiceStep(range, targetTicks, forceInteger)
         }
 
-        val niceMin = floor(effectiveMin / step) * step
-        val niceMax = ceil(effectiveMax / step) * step
+        val niceMin = floor(min / step) * step
+        var niceMax = ceil(effectiveMax / step) * step
+
+        if (capAtMax && niceMax > effectiveMax) {
+            niceMax = effectiveMax
+        }
 
         val ticks = mutableListOf<Float>()
         var current = niceMin
         val epsilon = step * 0.0001f
-        while (current <= niceMax + epsilon) {
+        while (current <= niceMax - epsilon) {
             val formatted = if (forceInteger) round(current) else current
             ticks.add(formatted)
             current += step
+        }
+
+        val formattedMax = if (forceInteger) round(niceMax) else niceMax
+        val minTickGap = step * 0.45f
+
+        if (ticks.isEmpty()) {
+            ticks.add(formattedMax)
+        } else {
+            val lastTick = ticks.last()
+            if (formattedMax > lastTick + epsilon) {
+                if (formattedMax - lastTick < minTickGap && ticks.size > 1) {
+                    ticks[ticks.lastIndex] = formattedMax
+                } else {
+                    ticks.add(formattedMax)
+                }
+            }
         }
 
         return TickResult(

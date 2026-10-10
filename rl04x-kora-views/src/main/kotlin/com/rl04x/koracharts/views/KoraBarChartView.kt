@@ -27,21 +27,23 @@ public class KoraBarChartView @JvmOverloads constructor(
     private val animator = LinearAnimator()
     private var animProgress: Float = 1f
 
-    private val scaleGestureDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-        override fun onScale(detector: ScaleGestureDetector): Boolean {
-            if (!config.enableZoom) return false
-            val newZoomX = (config.zoomScaleX * detector.scaleFactor).coerceIn(1f, 5f)
-            val newZoomY = (config.zoomScaleY * detector.scaleFactor).coerceIn(1f, 5f)
-            config = config.copy(zoomScaleX = newZoomX, zoomScaleY = newZoomY)
-            parent?.requestDisallowInterceptTouchEvent(true)
-            invalidate()
-            return true
-        }
-    })
+    private val scaleGestureDetector =
+        ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                if (!config.enableZoom) return false
+                val newZoomX = (config.zoomScaleX * detector.scaleFactor).coerceIn(1f, 5f)
+                val newZoomY = (config.zoomScaleY * detector.scaleFactor).coerceIn(1f, 5f)
+                config = config.copy(zoomScaleX = newZoomX, zoomScaleY = newZoomY)
+                parent?.requestDisallowInterceptTouchEvent(true)
+                invalidate()
+                return true
+            }
+        })
 
     init {
         if (attrs != null) {
-            val a = context.obtainStyledAttributes(attrs, R.styleable.KoraBarChartView, defStyleAttr, 0)
+            val a =
+                context.obtainStyledAttributes(attrs, R.styleable.KoraBarChartView, defStyleAttr, 0)
             val showGrid = a.getBoolean(R.styleable.KoraBarChartView_kora_showGrid, true)
             val showAxes = a.getBoolean(R.styleable.KoraBarChartView_kora_showAxes, true)
             val enableZoomXml = a.getBoolean(R.styleable.KoraBarChartView_kora_enableZoom, false)
@@ -100,20 +102,23 @@ public class KoraBarChartView @JvmOverloads constructor(
                 isDraggingChart = false
                 parent?.requestDisallowInterceptTouchEvent(false)
             }
+
             MotionEvent.ACTION_MOVE -> {
                 val dx = event.x - touchDownX
                 val dy = event.y - touchDownY
 
                 if (config.enableZoom && (config.zoomScaleX > 1.05f || config.zoomScaleY > 1.05f)) {
                     val density = resources.displayMetrics.density
-                    val leftPadding = if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
+                    val leftPadding =
+                        if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
                     val rightPadding = config.paddingDp * density
                     val drawWidth = (width.toFloat() - leftPadding - rightPadding).coerceAtLeast(1f)
 
                     val maxPanPixels = (drawWidth * config.zoomScaleX - drawWidth).coerceAtLeast(0f)
                     val newPanX = (config.panOffsetX - dx).coerceIn(0f, maxPanPixels)
 
-                    val engine = ChartEngine(width.toFloat(), height.toFloat(), config.paddingDp * density)
+                    val engine =
+                        ChartEngine(width.toFloat(), height.toFloat(), config.paddingDp * density)
                     val range = engine.computeRange(datasets)
                     val visibleRangeY = range.rangeY / config.zoomScaleY
                     val maxPanY = (range.rangeY - visibleRangeY).coerceAtLeast(0f)
@@ -140,15 +145,17 @@ public class KoraBarChartView @JvmOverloads constructor(
                     return false
                 }
             }
+
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 isDraggingChart = false
                 parent?.requestDisallowInterceptTouchEvent(false)
             }
         }
 
-        if (datasets.isNotEmpty() && width > 0 && height > 0) {
+        if (datasets.isNotEmpty() && width > 0 && height > 0 && event.actionMasked == MotionEvent.ACTION_UP && !isDraggingChart) {
             val density = resources.displayMetrics.density
-            val leftPadding = if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
+            val leftPadding =
+                if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
             val rightPadding = config.paddingDp * density
             val drawWidth = width.toFloat() - leftPadding - rightPadding
 
@@ -157,10 +164,20 @@ public class KoraBarChartView @JvmOverloads constructor(
             if (entryCount > 0 && drawWidth > 0f) {
                 val scaledSlotWidth = (drawWidth * maxOf(1f, config.zoomScaleX)) / entryCount
                 val relativeX = event.x - leftPadding + config.panOffsetX
-                val clickedIdx = (relativeX / scaledSlotWidth).toInt().coerceIn(0, entryCount - 1)
-                val clickedBar = visibleDatasets.first().entries.getOrNull(clickedIdx)
-                if (clickedBar != null && clickedBar != config.selectedEntry) {
-                    config = config.copy(selectedEntry = clickedBar)
+                val clickedIdx = (relativeX / scaledSlotWidth).toInt()
+                if (clickedIdx in 0 until entryCount) {
+                    val clickedBar = visibleDatasets.first().entries.getOrNull(clickedIdx)
+                    if (clickedBar != null) {
+                        if (config.selectedEntry == clickedBar) {
+                            config = config.copy(selectedEntry = null)
+                        } else {
+                            config = config.copy(selectedEntry = clickedBar)
+                        }
+                        performClick()
+                        invalidate()
+                    }
+                } else {
+                    config = config.copy(selectedEntry = null)
                     performClick()
                     invalidate()
                 }

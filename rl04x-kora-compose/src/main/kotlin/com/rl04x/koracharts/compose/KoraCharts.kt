@@ -72,15 +72,16 @@ public fun KoraLineChart(
         )
     }
 
-    val activeConfig = remember(config, selectedPoint, zoomScaleX, panOffsetX, zoomScaleY, panOffsetY) {
-        config.copy(
-            selectedEntry = selectedPoint,
-            zoomScaleX = zoomScaleX,
-            panOffsetX = panOffsetX,
-            zoomScaleY = zoomScaleY,
-            panOffsetY = panOffsetY,
-        )
-    }
+    val activeConfig =
+        remember(config, selectedPoint, zoomScaleX, panOffsetX, zoomScaleY, panOffsetY) {
+            config.copy(
+                selectedEntry = selectedPoint,
+                zoomScaleX = zoomScaleX,
+                panOffsetX = panOffsetX,
+                zoomScaleY = zoomScaleY,
+                panOffsetY = panOffsetY,
+            )
+        }
 
     val semanticsSummary = remember(datasets) {
         val allEntries = datasets.flatMap { it.entries }
@@ -102,7 +103,8 @@ public fun KoraLineChart(
                         onDragStart = { offset ->
                             val density = Resources.getSystem().displayMetrics.density
                             val padding = config.paddingDp * density
-                            val engine = ChartEngine(size.width.toFloat(), size.height.toFloat(), padding)
+                            val engine =
+                                ChartEngine(size.width.toFloat(), size.height.toFloat(), padding)
                             val range = engine.computeRange(datasets)
                             val nearest = engine.nearestEntry(
                                 offset.x, offset.y, datasets, range,
@@ -115,7 +117,8 @@ public fun KoraLineChart(
                             change.consume()
                             val density = Resources.getSystem().displayMetrics.density
                             val padding = config.paddingDp * density
-                            val engine = ChartEngine(size.width.toFloat(), size.height.toFloat(), padding)
+                            val engine =
+                                ChartEngine(size.width.toFloat(), size.height.toFloat(), padding)
                             val range = engine.computeRange(datasets)
                             val nearest = engine.nearestEntry(
                                 change.position.x, change.position.y, datasets, range,
@@ -128,18 +131,31 @@ public fun KoraLineChart(
                         }
                     )
                 }
-                .pointerInput(datasets, config, zoomScaleX, panOffsetX, zoomScaleY, panOffsetY) {
+                .pointerInput(
+                    datasets,
+                    config,
+                    zoomScaleX,
+                    panOffsetX,
+                    zoomScaleY,
+                    panOffsetY,
+                    selectedPoint
+                ) {
                     detectTapGestures { offset ->
                         val density = Resources.getSystem().displayMetrics.density
                         val padding = config.paddingDp * density
-                        val engine = ChartEngine(size.width.toFloat(), size.height.toFloat(), padding)
+                        val engine =
+                            ChartEngine(size.width.toFloat(), size.height.toFloat(), padding)
                         val range = engine.computeRange(datasets)
                         val nearest = engine.nearestEntry(
                             offset.x, offset.y, datasets, range,
                             zoomScaleX, panOffsetX, zoomScaleY, panOffsetY,
                         )
-                        selectedPoint = nearest
-                        nearest?.let { onPointSelected?.invoke(it.x, it.y) }
+                        if (selectedPoint != null && selectedPoint == nearest) {
+                            selectedPoint = null
+                        } else {
+                            selectedPoint = nearest
+                            nearest?.let { onPointSelected?.invoke(it.x, it.y) }
+                        }
                     }
                 }
                 .pointerInput(datasets, config) {
@@ -148,7 +164,11 @@ public fun KoraLineChart(
                             zoomScaleX = (zoomScaleX * zoom).coerceIn(1f, 5f)
                             zoomScaleY = (zoomScaleY * zoom).coerceIn(1f, 5f)
                             val density = Resources.getSystem().displayMetrics.density
-                            val engine = ChartEngine(size.width.toFloat(), size.height.toFloat(), config.paddingDp * density)
+                            val engine = ChartEngine(
+                                size.width.toFloat(),
+                                size.height.toFloat(),
+                                config.paddingDp * density
+                            )
                             val range = engine.computeRange(datasets)
 
                             val visibleRangeX = range.rangeX / zoomScaleX
@@ -215,36 +235,49 @@ public fun KoraBarChart(
         )
     }
 
-    val activeConfig = remember(config, selectedBar, zoomScaleX, panOffsetX, zoomScaleY, panOffsetY) {
-        config.copy(
-            selectedEntry = selectedBar,
-            zoomScaleX = zoomScaleX,
-            panOffsetX = panOffsetX,
-            zoomScaleY = zoomScaleY,
-            panOffsetY = panOffsetY,
-        )
-    }
+    val activeConfig =
+        remember(config, selectedBar, zoomScaleX, panOffsetX, zoomScaleY, panOffsetY) {
+            config.copy(
+                selectedEntry = selectedBar,
+                zoomScaleX = zoomScaleX,
+                panOffsetX = panOffsetX,
+                zoomScaleY = zoomScaleY,
+                panOffsetY = panOffsetY,
+            )
+        }
 
     Box(modifier = modifier) {
         Canvas(
             modifier = Modifier
                 .matchParentSize()
-                .pointerInput(datasets, config, zoomScaleX, panOffsetX) {
+                .pointerInput(datasets, config, zoomScaleX, panOffsetX, selectedBar) {
                     detectTapGestures { offset ->
                         val density = Resources.getSystem().displayMetrics.density
-                        val leftPadding = if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
+                        val leftPadding =
+                            if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
                         val rightPadding = config.paddingDp * density
                         val drawWidth = size.width.toFloat() - leftPadding - rightPadding
 
-                        val visibleDatasets = datasets.filter { it.visible && it.entries.isNotEmpty() }
+                        val visibleDatasets =
+                            datasets.filter { it.visible && it.entries.isNotEmpty() }
                         val entryCount = visibleDatasets.firstOrNull()?.entries?.size ?: 0
                         if (entryCount > 0 && drawWidth > 0f) {
                             val effectiveZoomX = maxOf(1f, zoomScaleX)
                             val scaledSlotWidth = (drawWidth * effectiveZoomX) / entryCount
                             val relativeX = offset.x - leftPadding + panOffsetX
-                            val clickedIdx = (relativeX / scaledSlotWidth).toInt().coerceIn(0, entryCount - 1)
-                            selectedBar = visibleDatasets.first().entries.getOrNull(clickedIdx)
-                            selectedBar?.let { onBarSelected?.invoke(it.x, it.y) }
+                            val clickedIdx = (relativeX / scaledSlotWidth).toInt()
+
+                            if (clickedIdx in 0 until entryCount) {
+                                val tapped = visibleDatasets.first().entries.getOrNull(clickedIdx)
+                                if (selectedBar != null && selectedBar == tapped) {
+                                    selectedBar = null
+                                } else {
+                                    selectedBar = tapped
+                                    tapped?.let { onBarSelected?.invoke(it.x, it.y) }
+                                }
+                            } else {
+                                selectedBar = null
+                            }
                         }
                     }
                 }
@@ -255,14 +288,20 @@ public fun KoraBarChart(
                             zoomScaleY = (zoomScaleY * zoom).coerceIn(1f, 5f)
 
                             val density = Resources.getSystem().displayMetrics.density
-                            val leftPadding = if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
+                            val leftPadding =
+                                if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
                             val rightPadding = config.paddingDp * density
                             val drawWidth = size.width.toFloat() - leftPadding - rightPadding
 
-                            val maxPanPixels = (drawWidth * zoomScaleX - drawWidth).coerceAtLeast(0f)
+                            val maxPanPixels =
+                                (drawWidth * zoomScaleX - drawWidth).coerceAtLeast(0f)
                             panOffsetX = (panOffsetX - pan.x).coerceIn(0f, maxPanPixels)
 
-                            val engine = ChartEngine(size.width.toFloat(), size.height.toFloat(), config.paddingDp * density)
+                            val engine = ChartEngine(
+                                size.width.toFloat(),
+                                size.height.toFloat(),
+                                config.paddingDp * density
+                            )
                             val range = engine.computeRange(datasets)
                             val visibleRangeY = range.rangeY / zoomScaleY
                             val maxPanY = (range.rangeY - visibleRangeY).coerceAtLeast(0f)
@@ -318,14 +357,19 @@ public fun KoraPieChart(
     }
 
     Canvas(
-        modifier = modifier.pointerInput(datasets, config, holeRadius) {
+        modifier = modifier.pointerInput(datasets, config, holeRadius, selectedSlice) {
             detectTapGestures { offset ->
                 val density = Resources.getSystem().displayMetrics.density
                 val padding = config.paddingDp * density
                 val engine = ChartEngine(size.width.toFloat(), size.height.toFloat(), padding)
-                val tappedSlice = engine.findPieEntryAt(offset.x, offset.y, datasets, holeRadius, density)
-                selectedSlice = tappedSlice
-                tappedSlice?.let { onSliceSelected?.invoke(it) }
+                val tappedSlice =
+                    engine.findPieEntryAt(offset.x, offset.y, datasets, holeRadius, density)
+                if (selectedSlice != null && selectedSlice == tappedSlice) {
+                    selectedSlice = null
+                } else {
+                    selectedSlice = tappedSlice
+                    tappedSlice?.let { onSliceSelected?.invoke(it) }
+                }
             }
         },
     ) {

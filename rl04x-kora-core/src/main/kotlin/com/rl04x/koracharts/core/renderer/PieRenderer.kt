@@ -56,13 +56,9 @@ public class PieRenderer(
         style = Paint.Style.STROKE
     }
 
-    private val glassShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-    }
-
     private val badgeTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
-        textSize = 11f
+        textSize = 12f
         textAlign = Paint.Align.CENTER
     }
 
@@ -107,7 +103,7 @@ public class PieRenderer(
         labelPaint.textSize = 12f * density
         centerTitlePaint.textSize = 20f * density
         centerSubtitlePaint.textSize = 13f * density
-        badgeTextPaint.textSize = 11f * density
+        badgeTextPaint.textSize = 8f * density
 
         val padding = config.paddingDp * density
         val outerMargin = 12f * density
@@ -190,19 +186,35 @@ public class PieRenderer(
                 val bx = (centerX + shiftX + badgeRadius * cos(midAngleRad)).toFloat()
                 val by = (centerY + shiftY + badgeRadius * sin(midAngleRad)).toFloat()
                 val pct = (entry.y / total) * 100f
-                val badgeText =
-                    "${entry.label ?: "Item"}: ${String.format(Locale.US, "%.0f%%", pct)}"
+
+                val baseLabel = entry.label ?: "Item"
+                val badgeText = if (baseLabel.contains("\n")) {
+                    baseLabel
+                } else {
+                    "$baseLabel: ${String.format(Locale.US, "%.0f%%", pct)}"
+                }
 
                 pendingSelectedBadge = Runnable {
-                    badgeTextPaint.getTextBounds(badgeText, 0, badgeText.length, textBoundsRect)
-                    val textWidth = badgeTextPaint.measureText(badgeText)
-                    val textHeight = textBoundsRect.height().toFloat()
+                    val lines = badgeText.split("\n")
+                    badgeTextPaint.color = config.style.tooltipTextColor
+                    badgeTextPaint.textSize = 8f * density
+                    badgeTextPaint.textAlign = Paint.Align.CENTER
 
-                    val paddingX = 8f * density
-                    val paddingY = 5f * density
+                    var maxTextWidth = 0f
+                    val lineSpacing = 16f * density
 
-                    val badgeWidth = textWidth + (paddingX * 2f)
-                    val badgeHeight = textHeight + (paddingY * 2f)
+                    for (line in lines) {
+                        badgeTextPaint.getTextBounds(line, 0, line.length, textBoundsRect)
+                        val w = badgeTextPaint.measureText(line)
+                        if (w > maxTextWidth) maxTextWidth = w
+                    }
+                    val totalTextHeight = lines.size * lineSpacing
+
+                    val paddingX = config.tooltipPaddingXDp * density
+                    val paddingY = config.tooltipPaddingYDp * density
+
+                    val badgeWidth = maxTextWidth + (paddingX * 2f)
+                    val badgeHeight = totalTextHeight + (paddingY * 2f)
 
                     val badgeRect = RectF(
                         bx - (badgeWidth / 2f),
@@ -230,26 +242,24 @@ public class PieRenderer(
                         (height - screenMargin) - badgeRect.bottom
                     )
 
-                    val shadowRect = RectF(
-                        badgeRect.left,
-                        badgeRect.top + 2f * density,
-                        badgeRect.right,
-                        badgeRect.bottom + 2f * density
-                    )
-                    glassShadowPaint.color =
-                        Color.argb((0.25f * 255 * progress).toInt().coerceIn(0, 255), 0, 0, 0)
-                    canvas.drawRoundRect(shadowRect, 7f * density, 7f * density, glassShadowPaint)
-
+                    val cornerPx = config.tooltipCornerRadiusDp * density
                     glassBgPaint.color = config.style.tooltipBackgroundColor
+                    canvas.drawRoundRect(badgeRect, cornerPx, cornerPx, glassBgPaint)
 
-                    glassBorderPaint.strokeWidth = 1.2f * density
-                    glassBorderPaint.color = config.style.tooltipBorderColor
+                    if (config.showTooltipBorder) {
+                        glassBorderPaint.strokeWidth = 1f * density
+                        glassBorderPaint.color = config.style.tooltipBorderColor
+                        canvas.drawRoundRect(badgeRect, cornerPx, cornerPx, glassBorderPaint)
+                    }
 
-                    canvas.drawRoundRect(badgeRect, 7f * density, 7f * density, glassBgPaint)
-                    canvas.drawRoundRect(badgeRect, 7f * density, 7f * density, glassBorderPaint)
-
-                    val textY = badgeRect.centerY() + (textHeight / 2f) - 1.5f * density
-                    canvas.drawText(badgeText, badgeRect.centerX(), textY, badgeTextPaint)
+                    val totalLines = lines.size
+                    val fontCapHeight = 12f * density * 0.7f
+                    var startY =
+                        badgeRect.centerY() - ((totalLines - 1) * lineSpacing) / 2f + (fontCapHeight / 3.5f)
+                    for (line in lines) {
+                        canvas.drawText(line, badgeRect.centerX(), startY, badgeTextPaint)
+                        startY += lineSpacing
+                    }
                 }
             } else {
                 canvas.drawArc(oval, startAngle, sweepAngle, !isDonut, slicePaint)
@@ -283,7 +293,8 @@ public class PieRenderer(
 
                     val isRightSide = cos(midAngleRad) >= 0
                     val textColor = entry.textColor ?: config.style.labelTextColor
-                    val displayText = entry.label?.let { "$it: $pctText" } ?: pctText
+                    val displayText =
+                        entry.label?.substringBefore('\n')?.let { "$it: $pctText" } ?: pctText
 
                     val item = CalloutItem(
                         p1x = p1x,
@@ -374,7 +385,7 @@ public class PieRenderer(
 
             val selected = config.selectedEntry
             val titleText = if (selected != null) {
-                selected.label ?: "Selected"
+                selected.label?.substringBefore('\n') ?: "Selected"
             } else {
                 config.centerTitle ?: "Total"
             }

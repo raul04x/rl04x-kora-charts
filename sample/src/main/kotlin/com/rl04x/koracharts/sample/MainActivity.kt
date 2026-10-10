@@ -51,6 +51,7 @@ import com.rl04x.koracharts.compose.KoraRadarChart
 import com.rl04x.koracharts.compose.KoraStackedBarChart
 import com.rl04x.koracharts.core.model.ChartConfig
 import com.rl04x.koracharts.core.model.KoraChartStyle
+import com.rl04x.koracharts.core.model.StackedBarEntry
 import com.rl04x.koracharts.sample.databinding.ActivityXmlViewsGalleryBinding
 
 class MainActivity : ComponentActivity() {
@@ -421,6 +422,19 @@ fun DashboardScreen() {
                             chartConfig.copy(centerTitle = "52%", centerSubtitle = "Chrome")
                         )
                         binding.stackedBarChartView.setData(channelData, chartConfig)
+                        binding.stackedBarChartView.onBarSelectedListener = { entry ->
+                            if (entry != null) {
+                                binding.card5.setBadge("Selected: ${entry.label}")
+                                binding.card5.setSubtitle(
+                                    "${entry.label}: Total €${
+                                        entry.values.sum().toInt()
+                                    }"
+                                )
+                            } else {
+                                binding.card5.setBadge(null)
+                                binding.card5.setSubtitle("Accumulated breakdown (€)")
+                            }
+                        }
                         binding.candlestickChartView.setData(cryptoData, chartConfig)
                         binding.radarChartView.setData(devRadarData, chartConfig)
                         binding.combinedChartView.setData(userTrafficData, chartConfig)
@@ -575,10 +589,18 @@ fun DashboardScreen() {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                var selectedStackedBar by remember { mutableStateOf<StackedBarEntry?>(null) }
+
                 // 5. Stacked Bar Chart: Sales Channels
                 KoraChartCard(
                     title = "Sales Channels",
-                    subtitle = "Accumulated breakdown (€k)",
+                    subtitle = selectedStackedBar?.let {
+                        "${it.label}: Total €${
+                            it.values.sum().toInt()
+                        } (${it.values.joinToString(" + ") { v -> "€" + v.toInt() }})"
+                    }
+                        ?: "Accumulated breakdown (€) · Pinch to zoom",
+                    badgeText = selectedStackedBar?.let { "Selected: ${it.label}" } ?: "Zoom & Pan",
                     chartHeight = selectedHeightDp.dp,
                     style = chartStyle,
                     modifier = Modifier.fillMaxWidth(),
@@ -587,6 +609,9 @@ fun DashboardScreen() {
                         entries = channelData,
                         config = chartConfig,
                         modifier = Modifier.fillMaxSize(),
+                        onBarSelected = { entry ->
+                            selectedStackedBar = entry
+                        },
                     )
                 }
 

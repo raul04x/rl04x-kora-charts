@@ -111,7 +111,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            app:kora_cardSubtitle="Accumulated breakdown (€k)"
+            app:kora_cardSubtitle="Accumulated breakdown (€)"
             app:kora_cardTitle="Sales Channels">
 
             <com.rl04x.koracharts.views.KoraStackedBarChartView
@@ -119,6 +119,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="220dp"
                 app:kora_animationDuration="600"
+                app:kora_enableZoom="true"
                 app:kora_showAxisLabels="true"
                 app:kora_showGrid="true" />
         </com.rl04x.koracharts.views.KoraChartCardView>

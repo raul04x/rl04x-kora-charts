@@ -51,8 +51,8 @@ public class BubbleRenderer : BaseRenderer<BubbleEntry> {
             if (config.showAxisLabels) config.paddingDp * density + 24f * density else config.paddingDp * density
         val bottomPadding =
             if (config.showAxisLabels) config.paddingDp * density + 20f * density else config.paddingDp * density
-        val topPadding = config.paddingDp * density + 16f * density
-        val rightPadding = config.paddingDp * density
+        val topPadding = config.paddingDp * density + 28f * density
+        val rightPadding = config.paddingDp * density + 16f * density
 
         val drawWidth = width - leftPadding - rightPadding
         val drawHeight = height - topPadding - bottomPadding
@@ -74,6 +74,7 @@ public class BubbleRenderer : BaseRenderer<BubbleEntry> {
                 targetTicks = 4,
                 customStep = config.yAxisStep,
                 forceInteger = config.forceIntegerTicks,
+                capAtMax = config.capNiceTicksAtMax,
             )
         } else null
 

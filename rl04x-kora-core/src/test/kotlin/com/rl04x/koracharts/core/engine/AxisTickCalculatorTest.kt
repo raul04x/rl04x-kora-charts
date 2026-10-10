@@ -25,19 +25,19 @@ public class AxisTickCalculatorTest {
     }
 
     @Test
-    public fun `computeNiceTicks returns ticks counting by 5s for range 0 to 22`() {
+    public fun `computeNiceTicks returns ticks capped at max for range 0 to 22`() {
         val result = AxisTickCalculator.computeNiceTicks(min = 0f, max = 22f, targetTicks = 4)
         assertEquals(5f, result.step, 0.001f)
-        assertEquals(listOf(0f, 5f, 10f, 15f, 20f, 25f), result.ticks)
+        assertEquals(listOf(0f, 5f, 10f, 15f, 22f), result.ticks)
         assertEquals(0f, result.niceMin, 0.001f)
-        assertEquals(25f, result.niceMax, 0.001f)
+        assertEquals(22f, result.niceMax, 0.001f)
     }
 
     @Test
-    public fun `computeNiceTicks returns ticks counting by 100s for range 0 to 450`() {
+    public fun `computeNiceTicks returns ticks capped at max for range 0 to 450`() {
         val result = AxisTickCalculator.computeNiceTicks(min = 0f, max = 450f, targetTicks = 4)
         assertEquals(100f, result.step, 0.001f)
-        assertEquals(listOf(0f, 100f, 200f, 300f, 400f, 500f), result.ticks)
+        assertEquals(listOf(0f, 100f, 200f, 300f, 400f, 450f), result.ticks)
     }
 
     @Test
@@ -53,5 +53,29 @@ public class AxisTickCalculatorTest {
             AxisTickCalculator.computeNiceTicks(min = 0.1f, max = 0.8f, forceInteger = true)
         assertTrue("Step must be at least 1.0", result.step >= 1f)
         assertEquals(listOf(0f, 1f), result.ticks)
+    }
+
+    @Test
+    public fun `computeNiceTicks with capAtMax caps upper tick at max value`() {
+        val result = AxisTickCalculator.computeNiceTicks(
+            min = 0f,
+            max = 22f,
+            targetTicks = 4,
+            capAtMax = true
+        )
+        assertEquals(22f, result.niceMax, 0.001f)
+        assertEquals(listOf(0f, 5f, 10f, 15f, 22f), result.ticks)
+    }
+
+    @Test
+    public fun `computeNiceTicks with capAtMax for range 0 to 450 caps at 450`() {
+        val result = AxisTickCalculator.computeNiceTicks(
+            min = 0f,
+            max = 450f,
+            targetTicks = 4,
+            capAtMax = true
+        )
+        assertEquals(450f, result.niceMax, 0.001f)
+        assertEquals(listOf(0f, 100f, 200f, 300f, 400f, 450f), result.ticks)
     }
 }

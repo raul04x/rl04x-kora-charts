@@ -27,10 +27,18 @@ object SampleData {
         val previousMonthValues = listOf(150f, 410f, 690f, 980f, 1310f, 1650f, 1920f)
 
         val currentEntries = days.mapIndexed { idx, d ->
-            Entry(idx.toFloat() * 5f + 1f, currentMonthValues[idx], d)
+            Entry(
+                idx.toFloat() * 5f + 1f,
+                currentMonthValues[idx],
+                "$d\nExpenses: €${currentMonthValues[idx].toInt()}\nStatus: On Track"
+            )
         }
         val previousEntries = days.mapIndexed { idx, d ->
-            Entry(idx.toFloat() * 5f + 1f, previousMonthValues[idx], d)
+            Entry(
+                idx.toFloat() * 5f + 1f,
+                previousMonthValues[idx],
+                "$d\nPrevious: €${previousMonthValues[idx].toInt()}"
+            )
         }
 
         val currentDataset = Dataset(
@@ -67,7 +75,7 @@ object SampleData {
         val values = listOf(42f, 65f, 52f, 88f, 70f, 95f, 60f, 78f)
 
         val entries = categories.mapIndexed { idx, cat ->
-            Entry(idx.toFloat(), values[idx], "$cat (€${values[idx].toInt()}k)")
+            Entry(idx.toFloat(), values[idx], "$cat\nSales: €${values[idx].toInt()}k\nTarget: €80k")
         }
         val selectedEntry = entries[5]
 
@@ -107,29 +115,44 @@ object SampleData {
     // 4. Donut/Pie: Web Browser Market Share
     fun generateBrowserSharePieData(): List<Dataset> {
         val entries = listOf(
-            Entry(1f, 45f, "Chrome", color = yellowColor),
-            Entry(2f, 22f, "Safari", color = blueColor),
-            Entry(3f, 12f, "Firefox", color = purpleColor),
-            Entry(4f, 7f, "Edge", color = cyanColor),
-            Entry(5f, 5f, "Opera", color = coralColor),
-            Entry(6f, 4f, "Brave", color = emeraldColor),
-            Entry(7f, 3f, "Vivaldi", color = tealColor),
-            Entry(8f, 2f, "Others", color = lightPurpleColor),
+            Entry(1f, 45f, "Chrome\n45% Market Share\nUsers: 1.2B", color = yellowColor),
+            Entry(2f, 22f, "Safari\n22% Market Share\nUsers: 600M", color = blueColor),
+            Entry(3f, 12f, "Firefox\n12% Market Share\nUsers: 300M", color = purpleColor),
+            Entry(4f, 7f, "Edge\n7% Market Share\nUsers: 200M", color = cyanColor),
+            Entry(5f, 5f, "Opera\n5% Market Share\nUsers: 150M", color = coralColor),
+            Entry(6f, 4f, "Brave\n4% Market Share\nUsers: 100M", color = emeraldColor),
+            Entry(7f, 3f, "Vivaldi\n3% Market Share\nUsers: 50M", color = tealColor),
+            Entry(8f, 2f, "Others\n2% Market Share", color = lightPurpleColor),
         )
         return listOf(Dataset(entries = entries))
     }
 
-    // 5. Stacked Bar: Revenue by Sales Channel
+    // 5. Stacked Bar: Revenue by Sales Channel (Multi-Segment Stacked Bar)
     fun generateSalesChannelStackedData(): List<StackedBarEntry> {
         val months = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug")
-        val colors = listOf(tealColor, coralColor, yellowColor)
+        val colors = listOf(
+            tealColor, coralColor, yellowColor,
+            blueColor, purpleColor, emeraldColor
+        )
+        val segmentLabels = listOf(
+            "Direct Sales", "Online Store", "Retail Partners",
+            "Affiliates", "Social Media", "Referrals"
+        )
 
         return months.mapIndexed { idx, m ->
             StackedBarEntry(
                 x = idx.toFloat(),
-                values = listOf(25f + idx * 3f, 18f + (idx % 4) * 6f, 12f + (idx % 3) * 7f),
+                values = listOf(
+                    18f + idx * 2f,
+                    14f + (idx % 4) * 4f,
+                    10f + (idx % 3) * 5f,
+                    12f + (idx % 2) * 6f,
+                    8f + (idx % 5) * 3f,
+                    15f + (idx % 3) * 4f,
+                ),
                 colors = colors,
                 label = m,
+                segmentLabels = segmentLabels,
             )
         }
     }

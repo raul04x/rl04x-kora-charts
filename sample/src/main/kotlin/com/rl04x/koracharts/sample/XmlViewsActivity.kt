@@ -35,6 +35,15 @@ class XmlViewsActivity : AppCompatActivity() {
         binding.horizontalBarChartView.setData(latencyData)
         binding.pieChartView.setData(browserData)
         binding.stackedBarChartView.setData(channelData)
+        binding.stackedBarChartView.onBarSelectedListener = { entry ->
+            if (entry != null) {
+                binding.card5.setBadge("Selected: ${entry.label}")
+                binding.card5.setSubtitle("${entry.label}: Total €${entry.values.sum().toInt()}")
+            } else {
+                binding.card5.setBadge(null)
+                binding.card5.setSubtitle("Accumulated breakdown (€)")
+            }
+        }
         binding.candlestickChartView.setData(cryptoData)
         binding.radarChartView.setData(devRadarData)
         binding.combinedChartView.setData(userTrafficData)
