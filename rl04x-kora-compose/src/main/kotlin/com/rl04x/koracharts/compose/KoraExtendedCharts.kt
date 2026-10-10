@@ -186,7 +186,7 @@ public fun KoraStackedBarChart(
                             val density = Resources.getSystem().displayMetrics.density
                             val leftPadding =
                                 if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
-                            val rightPadding = config.paddingDp * density
+                            val rightPadding = config.paddingDp * density + 10f * density
                             val drawWidth = size.width.toFloat() - leftPadding - rightPadding
 
                             val entryCount = entries.size
@@ -207,7 +207,7 @@ public fun KoraStackedBarChart(
                             val density = Resources.getSystem().displayMetrics.density
                             val leftPadding =
                                 if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
-                            val rightPadding = config.paddingDp * density
+                            val rightPadding = config.paddingDp * density + 10f * density
                             val drawWidth = size.width.toFloat() - leftPadding - rightPadding
 
                             val entryCount = entries.size
@@ -236,7 +236,7 @@ public fun KoraStackedBarChart(
                             val density = Resources.getSystem().displayMetrics.density
                             val leftPadding =
                                 if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
-                            val rightPadding = config.paddingDp * density
+                            val rightPadding = config.paddingDp * density + 10f * density
                             val drawWidth = size.width.toFloat() - leftPadding - rightPadding
 
                             val maxPanPixels =

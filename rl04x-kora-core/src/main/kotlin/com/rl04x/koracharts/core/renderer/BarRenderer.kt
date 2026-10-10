@@ -4,6 +4,7 @@ import android.content.res.Resources
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import androidx.core.graphics.withClip
 import com.rl04x.koracharts.core.engine.ChartEngine
@@ -15,7 +16,8 @@ import com.rl04x.koracharts.core.renderer.helper.LegendRenderer
 import java.util.Locale
 
 /**
- * Renderer for Bar Charts with Glassmorphic badge overlays, top headroom for capped axes, and Y=0 anchored baselines.
+ * Renderer for Bar Charts with top-only rounded corners (flat base), Glassmorphic badge overlays,
+ * top headroom for capped axes, smart X label vertical -90deg rotation aligned to bar base center, and Y=0 anchored baselines.
  */
 public class BarRenderer : BaseRenderer<Dataset> {
 
@@ -33,8 +35,13 @@ public class BarRenderer : BaseRenderer<Dataset> {
         style = Paint.Style.STROKE
     }
 
-    // Cached RectF instances to prevent allocation during draw()
+    private val tempMeasurePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 10f
+    }
+
+    // Cached RectF and Path instances to prevent allocation during draw()
     private val cachedBarRect = RectF()
+    private val barPath = Path()
     private val cachedZonePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val cachedRefLinePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
@@ -72,17 +79,22 @@ public class BarRenderer : BaseRenderer<Dataset> {
         val firstDataset = visibleDatasets.first()
         val entryCount = firstDataset.entries.size
 
+        tempMeasurePaint.textSize = 10f * density
+        val drawWidthEstimate = (width - (config.paddingDp * density * 2f) - 38f * density).coerceAtLeast(1f)
+        val estimatedSlotWidth = (drawWidthEstimate / entryCount).coerceAtLeast(1f)
+
         val hasRotatedLabels = config.showAxisLabels && (
                 config.xAxisLabelRotation != 0f ||
                         firstDataset.entries.any { e ->
                             val text = config.xAxisFormatter?.invoke(e.x)
                                 ?: e.label?.substringBefore('\n') ?: ""
-                            text.length > 5 || (entryCount > 5 && text.length > 4)
+                            val textWidth = tempMeasurePaint.measureText(text)
+                            textWidth > (estimatedSlotWidth - 4f * density) && text.length > 3
                         }
                 )
 
         val defaultRotation = if (hasRotatedLabels) {
-            if (config.xAxisLabelRotation != 0f) config.xAxisLabelRotation else -45f
+            if (config.xAxisLabelRotation != 0f) config.xAxisLabelRotation else -90f
         } else 0f
 
         val hasSecondaryY = config.showSecondaryYAxis || data.any { it.useSecondaryAxis }
@@ -227,11 +239,13 @@ public class BarRenderer : BaseRenderer<Dataset> {
         val maxPanPixels = (drawWidth * effectiveZoomX - drawWidth).coerceAtLeast(0f)
         val clampedPanPixels = config.panOffsetX.coerceIn(0f, maxPanPixels)
 
-        // PASS 1: Drawing bars clipped strictly to plotting area including top headroom for rounded bar caps
+        val cornerRadius = 4f * density
+
+        // PASS 1: Drawing bars clipped strictly to plotting area
         canvas.withClip(
-            leftPadding - 4f * density,
+            leftPadding,
             topPadding,
-            width - rightPadding + 4f * density,
+            width - rightPadding,
             baselineY
         ) {
             for (eIdx in 0 until entryCount) {
@@ -251,17 +265,25 @@ public class BarRenderer : BaseRenderer<Dataset> {
 
                     barPaint.color = dataset.color
                     cachedBarRect.set(barLeft, barTop, barRight, baselineY)
-                    canvas.drawRoundRect(cachedBarRect, 8f * density, 8f * density, barPaint)
+
+                    barPath.reset()
+                    barPath.addRoundRect(
+                        cachedBarRect,
+                        floatArrayOf(
+                            cornerRadius, cornerRadius, // Top-Left
+                            cornerRadius, cornerRadius, // Top-Right
+                            0f, 0f,                     // Bottom-Right (FLAT BASE)
+                            0f, 0f                      // Bottom-Left  (FLAT BASE)
+                        ),
+                        Path.Direction.CW
+                    )
+
+                    canvas.drawPath(barPath, barPaint)
 
                     val isSelected = (config.selectedEntry == entry)
                     if (isSelected) {
                         highlightBorderPaint.color = config.style.highlightLineColor
-                        canvas.drawRoundRect(
-                            cachedBarRect,
-                            8f * density,
-                            8f * density,
-                            highlightBorderPaint
-                        )
+                        canvas.drawPath(barPath, highlightBorderPaint)
 
                         val cx = barLeft + (barWidth / 2f)
                         glassTooltipRenderer.drawCrosshairs(
@@ -299,35 +321,24 @@ public class BarRenderer : BaseRenderer<Dataset> {
             }
         }
 
-        // PASS 2: Drawing X axis labels
-        if (config.showAxisLabels) {
-            for (eIdx in 0 until entryCount) {
-                val slotLeft = leftPadding + (eIdx * scaledSlotWidth) - clampedPanPixels
-                val slotCenterX = slotLeft + (scaledSlotWidth / 2f)
-
-                if (slotCenterX in (leftPadding - 8f * density)..(width - rightPadding + 8f * density) && firstDataset.entries.size > eIdx) {
-                    val entry = firstDataset.entries[eIdx]
-                    val rawText = config.xAxisFormatter?.invoke(entry.x)
-                        ?: entry.label?.substringBefore('\n')
-                        ?: String.format(Locale.US, "%.0f", entry.x)
-
-                    val labelText =
-                        if (rawText.length > config.xAxisLabelMaxLen && defaultRotation == 0f) {
-                            rawText.take(config.xAxisLabelMaxLen - 1) + "…"
-                        } else rawText
-
-                    axisGridRenderer.drawXAxisLabel(
-                        canvas = canvas,
-                        label = labelText,
-                        cx = slotCenterX,
-                        baselineY = baselineY,
-                        rotationDeg = defaultRotation,
-                        config = config,
-                        density = density,
-                    )
-                }
-            }
-        }
+        // PASS 2: Drawing X axis labels aligned to slot centers (bar centers)
+        axisGridRenderer.drawXAxisGridAndLabels(
+            canvas = canvas,
+            config = config,
+            entries = firstDataset.entries,
+            minX = range.minX,
+            maxX = range.maxX,
+            leftPadding = leftPadding,
+            topPadding = topPadding,
+            drawWidth = drawWidth,
+            drawHeight = drawHeight,
+            density = density,
+            topHeadroom = topHeadroom,
+            effectiveZoomX = effectiveZoomX,
+            clampedPanPixels = clampedPanPixels,
+            defaultRotation = defaultRotation,
+            useSlotCenters = true,
+        )
 
         // PASS 3: Draw Badges using GlassTooltipRenderer
         for (i in 0 until badgeCount) {

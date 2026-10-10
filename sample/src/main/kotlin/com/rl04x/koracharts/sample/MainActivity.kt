@@ -591,16 +591,16 @@ fun DashboardScreen() {
 
                 var selectedStackedBar by remember { mutableStateOf<StackedBarEntry?>(null) }
 
-                // 5. Stacked Bar Chart: Sales Channels
+                // 5. Stacked Bar Chart: French Loan Amortization
                 KoraChartCard(
-                    title = "Sales Channels",
+                    title = "French Loan Amortization",
                     subtitle = selectedStackedBar?.let {
                         "${it.label}: Total €${
                             it.values.sum().toInt()
-                        } (${it.values.joinToString(" + ") { v -> "€" + v.toInt() }})"
+                        } (Principal: €${it.values[0].toInt()} + Interest: €${it.values[1].toInt()})"
                     }
-                        ?: "Accumulated breakdown (€) · Pinch to zoom",
-                    badgeText = selectedStackedBar?.let { "Selected: ${it.label}" } ?: "Zoom & Pan",
+                        ?: "Fixed €222/mo · Principal (Green) vs Interest (Red) · Pinch to zoom",
+                    badgeText = selectedStackedBar?.let { "Selected: ${it.label}" } ?: "60 Months",
                     chartHeight = selectedHeightDp.dp,
                     style = chartStyle,
                     modifier = Modifier.fillMaxWidth(),

@@ -16,7 +16,8 @@ import com.rl04x.koracharts.core.renderer.helper.LegendRenderer
 import java.util.Locale
 
 /**
- * Renderer for Line Charts with Glassmorphic badge overlays, top headroom for capped axes, and zero-allocation drawing loops.
+ * Renderer for Line Charts on a Cartesian plane originating at (0,0) with 0 <= x <= M and 0 <= y <= N,
+ * drawing line paths strictly through provided data points (including (0,0) if and only if present in data).
  */
 public class LineRenderer : BaseRenderer<Dataset> {
 
@@ -72,7 +73,6 @@ public class LineRenderer : BaseRenderer<Dataset> {
         if (visibleDatasets.isEmpty()) return
 
         val firstDataset = visibleDatasets.first()
-        val entryCount = firstDataset.entries.size
 
         val hasRotatedLabels = config.showAxisLabels && (
                 config.xAxisLabelRotation != 0f ||
@@ -81,7 +81,7 @@ public class LineRenderer : BaseRenderer<Dataset> {
                         }
                 )
         val defaultRotation = if (hasRotatedLabels) {
-            if (config.xAxisLabelRotation != 0f) config.xAxisLabelRotation else -45f
+            if (config.xAxisLabelRotation != 0f) config.xAxisLabelRotation else -90f
         } else 0f
 
         val hasSecondaryY = config.showSecondaryYAxis || data.any { it.useSecondaryAxis }
@@ -90,9 +90,9 @@ public class LineRenderer : BaseRenderer<Dataset> {
         val leftPadding =
             if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
         val rightPadding =
-            if (hasSecondaryY && config.showAxisLabels) config.paddingDp * density + 32f * density else config.paddingDp * density + 10f * density
+            if (hasSecondaryY && config.showAxisLabels) config.paddingDp * density + 32f * density else config.paddingDp * density + 18f * density
         val bottomPadding = if (config.showAxisLabels) {
-            config.paddingDp * density + (if (hasRotatedLabels) 50f * density else 16f * density)
+            config.paddingDp * density + (if (hasRotatedLabels) 60f * density else 16f * density)
         } else {
             config.paddingDp * density
         }
@@ -117,11 +117,16 @@ public class LineRenderer : BaseRenderer<Dataset> {
         val engine = ChartEngine(width, height, config.paddingDp * density)
         val range = engine.computeRange(data)
 
+        // Cartesian Plane rule: Origin is (0, 0)
+        val minX = 0f
+        val maxX = maxOf(1f, range.maxX)
+        val rangeX = maxX
+
         val visibleZoomY = maxOf(1f, config.zoomScaleY)
-        val visibleRangeY = if (visibleZoomY == 1f) range.rangeY else range.rangeY / visibleZoomY
-        val maxPanY = (range.rangeY - visibleRangeY).coerceAtLeast(0f)
+        val visibleRangeY = if (visibleZoomY == 1f) maxOf(1f, range.maxY) else maxOf(1f, range.maxY) / visibleZoomY
+        val maxPanY = (range.maxY - visibleRangeY).coerceAtLeast(0f)
         val clampedPanY = config.panOffsetY.coerceIn(0f, maxPanY)
-        val visibleMinY = range.minY + clampedPanY
+        val visibleMinY = clampedPanY
         val visibleMaxY = visibleMinY + visibleRangeY
 
         val tickResult = axisGridRenderer.drawYAxisGridAndLabels(
@@ -138,7 +143,7 @@ public class LineRenderer : BaseRenderer<Dataset> {
             topHeadroom = topHeadroom,
         )
 
-        val effectiveMinY = tickResult?.niceMin ?: visibleMinY
+        val effectiveMinY = 0f
         val effectiveMaxY = tickResult?.niceMax ?: visibleMaxY
         val effectiveRangeY = (effectiveMaxY - effectiveMinY).coerceAtLeast(1f)
         val baselineY = topPadding + topHeadroom + drawHeight
@@ -160,11 +165,11 @@ public class LineRenderer : BaseRenderer<Dataset> {
         val maxPanPixels = (drawWidth * effectiveZoomX - drawWidth).coerceAtLeast(0f)
         val clampedPanPixels = config.panOffsetX.coerceIn(0f, maxPanPixels)
 
-        // Plotting area clipping with headroom for top point circles and side padding
+        // Strict plotting area clipping starting at leftPadding to prevent mounting over the Y axis line
         canvas.withClip(
-            leftPadding - 6f * density,
+            leftPadding,
             topPadding,
-            width - rightPadding + 6f * density,
+            width - rightPadding + 4f * density,
             baselineY
         ) {
             for (dataset in visibleDatasets) {
@@ -176,14 +181,15 @@ public class LineRenderer : BaseRenderer<Dataset> {
                 val linePoints = FloatArray(dataset.entries.size * 2)
                 var validCount = 0
 
+                var prevX = 0f
+                var prevY = 0f
+
                 for (idx in dataset.entries.indices) {
                     val entry = dataset.entries[idx]
-                    val pctX = if (entryCount > 1) {
-                        if (range.rangeX > 0f) (entry.x - range.minX) / range.rangeX else idx.toFloat() / (entryCount - 1)
-                    } else 0.5f
-                    val screenX =
-                        leftPadding + (pctX * drawWidth * effectiveZoomX) - clampedPanPixels
-                    val pctY = (entry.y - effectiveMinY) / effectiveRangeY
+                    val pctX = entry.x / rangeX
+                    val screenX = leftPadding + (pctX * drawWidth * effectiveZoomX) - clampedPanPixels
+
+                    val pctY = entry.y / effectiveRangeY
                     val targetY = topPadding + topHeadroom + (1f - pctY) * drawHeight
                     val animatedY = baselineY - ((baselineY - targetY) * progress)
 
@@ -197,8 +203,6 @@ public class LineRenderer : BaseRenderer<Dataset> {
                         fillPath.lineTo(screenX, animatedY)
                     } else {
                         if (dataset.isCurved) {
-                            val prevX = linePoints[(idx - 1) * 2]
-                            val prevY = linePoints[(idx - 1) * 2 + 1]
                             val controlX1 = prevX + (screenX - prevX) / 2f
                             val controlX2 = prevX + (screenX - prevX) / 2f
                             linePath.cubicTo(
@@ -222,6 +226,9 @@ public class LineRenderer : BaseRenderer<Dataset> {
                             fillPath.lineTo(screenX, animatedY)
                         }
                     }
+
+                    prevX = screenX
+                    prevY = animatedY
                 }
 
                 val lastX = linePoints[(validCount - 1) * 2]
@@ -298,39 +305,25 @@ public class LineRenderer : BaseRenderer<Dataset> {
             }
         }
 
-        // Draw X axis labels
-        if (config.showAxisLabels) {
-            for (idx in firstDataset.entries.indices) {
-                val entry = firstDataset.entries[idx]
-                val pctX = if (entryCount > 1) {
-                    if (range.rangeX > 0f) (entry.x - range.minX) / range.rangeX else idx.toFloat() / (entryCount - 1)
-                } else 0.5f
-                val cx = leftPadding + (pctX * drawWidth * effectiveZoomX) - clampedPanPixels
+        // PASS 2: Drawing X axis labels & vertical grid lines via AxisGridRenderer
+        axisGridRenderer.drawXAxisGridAndLabels(
+            canvas = canvas,
+            config = config,
+            entries = firstDataset.entries,
+            minX = minX,
+            maxX = maxX,
+            leftPadding = leftPadding,
+            topPadding = topPadding,
+            drawWidth = drawWidth,
+            drawHeight = drawHeight,
+            density = density,
+            topHeadroom = topHeadroom,
+            effectiveZoomX = effectiveZoomX,
+            clampedPanPixels = clampedPanPixels,
+            defaultRotation = defaultRotation,
+        )
 
-                if (cx in (leftPadding - 8f * density)..(width - rightPadding + 8f * density)) {
-                    val rawText = config.xAxisFormatter?.invoke(entry.x)
-                        ?: entry.label?.substringBefore('\n')
-                        ?: String.format(Locale.US, "%.0f", entry.x)
-
-                    val labelText =
-                        if (rawText.length > config.xAxisLabelMaxLen && defaultRotation == 0f) {
-                            rawText.take(config.xAxisLabelMaxLen - 1) + "…"
-                        } else rawText
-
-                    axisGridRenderer.drawXAxisLabel(
-                        canvas = canvas,
-                        label = labelText,
-                        cx = cx,
-                        baselineY = baselineY,
-                        rotationDeg = defaultRotation,
-                        config = config,
-                        density = density,
-                    )
-                }
-            }
-        }
-
-        // Draw Badges
+        // PASS 3: Draw Badges using GlassTooltipRenderer
         for (i in 0 until badgeCount) {
             val badge = badgePool[i]
             glassTooltipRenderer.drawGlassBadge(

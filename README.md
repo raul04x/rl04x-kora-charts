@@ -8,6 +8,10 @@
 
 ## 🌟 Key Features
 
+- **📐 Cartesian Plane Origin $(0, 0)$ & Flat Base Bars:**
+  - Strict Cartesian coordinate system originating at $(0,0)$ with $0 \le x \le M$ and $0 \le y \le N$. Points with $x > 0$ are visibly displaced from origin $X=0$.
+  - Vertical bar charts render flat bottom bases anchored at $Y=0$ with top-only rounded corners.
+
 - **⚡ Zero-Allocation Canvas Engine:**
   - Re-architected modular sub-renderers (`AxisGridRenderer`, `LegendRenderer`, `GlassTooltipRenderer`) with pre-allocated buffer recycling for zero Garbage Collection (GC) pressure at 60/120 FPS.
 
@@ -15,16 +19,12 @@
   - Glass badges featuring 85% translucency (`0xD9`) and clean left-aligned multi-line (`\n`) text formatting.
   - Automatic Stacked Bar breakdown cards detailing individual segment series names, segment values, and total sums.
 
-- **🛡️ Robust Edge-Case Math & Capped Headroom:**
-  - Full protection against zero-variance flat datasets ($y = \text{const}$), single-entry series, negative value ranges, and zero division.
-  - Top headroom spacing (`10dp`) ensuring rounded bar caps, point circles, and badges are rendered completely without being cut off when `capAtMax = true`.
-
-- **9 Chart Types Supported:**
+- **📊 9 Chart Types Supported:**
   1. **Line Chart** (`KoraLineChart`) — Smooth bezier curves with gradient fills, node points, and crosshair highlight lines.
-  2. **Bar Chart** (`KoraBarChart`) — Vertical rounded bars with $Y = 0$ anchored baselines, individual bar selection, and highlight borders.
+  2. **Bar Chart** (`KoraBarChart`) — Vertical rounded bars with $Y = 0$ flat-anchored baselines, top-only rounded corners, and highlight borders.
   3. **Horizontal Bar Chart** (`KoraHorizontalBarChart`) — Horizontal progress bars with track backgrounds and value labels.
   4. **Donut & Pie Chart** (`KoraPieChart`) — Donut chart with true ring rendering, Google WCAG contrast text, and auto-scaling center hole text.
-  5. **Stacked Bar Chart** (`KoraStackedBarChart`) — Multi-segment stacked bars with top-only rounded corners, multi-row legend wrapping, and segment breakdown cards.
+  5. **Stacked Bar Chart** (`KoraStackedBarChart`) — Multi-segment stacked bars supporting 480+ entries (e.g. credit loan schedules), top-only rounded corners, multi-row legend wrapping, and segment breakdown cards.
   6. **Candlestick Chart** (`KoraCandlestickChart`) — Financial candlestick chart with high/low wicks and bullish/bearish candle bodies.
   7. **Radar / Spider Chart** (`KoraRadarChart`) — Multi-axis polygon web chart comparing datasets across skill categories.
   8. **Combined Chart** (`KoraCombinedChart`) — Dual-layer chart overlaying vertical bars and line curves with node dots.
@@ -32,7 +32,7 @@
 
 - **🔢 Mathematical Axis Scaling & Nice Numbers (`AxisTickCalculator`):**
   - Automatically calculates clean, whole-number axis intervals ($1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, \dots$).
-  - Supports custom explicit step sizes via `xAxisStep` and `yAxisStep`.
+  - Smart stride sampling and trigonometric centering for X-axis labels at bar column centers `(cx, baselineY + 12dp)`.
 
 - **🎯 Key Value Indicators (Min, Max & Average Lines):**
   - Automatic floating badges for maximum and minimum entries (`▲ Max`, `▼ Min`).
@@ -90,13 +90,13 @@ dependencyResolutionManagement {
 ```kotlin
 dependencies {
     // For Jetpack Compose components
-    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-compose:1.0.0-beta01")
+    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-compose:1.0.0-beta03")
 
     // Core charting engine
-    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-core:1.0.0-beta01")
+    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-core:1.0.0-beta03")
 
     // For Android Views XML support (optional)
-    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-views:1.0.0-beta01")
+    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-views:1.0.0-beta03")
 }
 ```
 

@@ -47,6 +47,7 @@ public class ChartEngine(
         panOffsetX: Float = 0f,
     ): Float {
         val effectiveZoom = max(1f, zoomScaleX)
+        if (range.rangeX == 0f) return paddingPx + (drawWidth / 2f)
         val visibleRangeX = if (effectiveZoom == 1f) range.rangeX else range.rangeX / effectiveZoom
         if (visibleRangeX == 0f) return paddingPx + (drawWidth / 2f)
 
@@ -67,6 +68,7 @@ public class ChartEngine(
         panOffsetY: Float = 0f,
     ): Float {
         val effectiveZoom = max(1f, zoomScaleY)
+        if (range.rangeY == 0f) return paddingPx + (drawHeight / 2f)
         val visibleRangeY = if (effectiveZoom == 1f) range.rangeY else range.rangeY / effectiveZoom
         if (visibleRangeY == 0f) return paddingPx + (drawHeight / 2f)
 
@@ -86,6 +88,7 @@ public class ChartEngine(
         panOffsetX: Float = 0f,
     ): Float {
         val effectiveZoom = max(1f, zoomScaleX)
+        if (range.rangeX == 0f) return range.minX
         val visibleRangeX = if (effectiveZoom == 1f) range.rangeX else range.rangeX / effectiveZoom
         val maxPanOffset = (range.rangeX - visibleRangeX).coerceAtLeast(0f)
         val clampedPanOffset = panOffsetX.coerceIn(0f, maxPanOffset)
@@ -102,6 +105,7 @@ public class ChartEngine(
         panOffsetY: Float = 0f,
     ): Float {
         val effectiveZoom = max(1f, zoomScaleY)
+        if (range.rangeY == 0f) return range.minY
         val visibleRangeY = if (effectiveZoom == 1f) range.rangeY else range.rangeY / effectiveZoom
         val maxPanOffset = (range.rangeY - visibleRangeY).coerceAtLeast(0f)
         val clampedPanOffset = panOffsetY.coerceIn(0f, maxPanOffset)
@@ -138,7 +142,7 @@ public class ChartEngine(
 
     /**
      * Finds the nearest [Entry] to a screen coordinate for Line Charts,
-     * taking into account exact line renderer padding, 2D Zoom & Pan pixel offsets.
+     * taking into account Cartesian plane (0,0) origin, exact line renderer padding, and 2D Zoom & Pan.
      */
     public fun nearestLineEntry(
         screenX: Float,
@@ -155,6 +159,10 @@ public class ChartEngine(
         if (entryCount == 0) return null
 
         val range = computeRange(visibleDatasets)
+        val minX = 0f
+        val maxX = maxOf(1f, range.maxX)
+        val rangeX = maxX
+
         val hasSecondaryY = config.showSecondaryYAxis || datasets.any { it.useSecondaryAxis }
         val hasLegend = config.showLegend && datasets.any { it.label.isNotEmpty() }
 
@@ -167,9 +175,9 @@ public class ChartEngine(
         val leftPadding =
             if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
         val rightPadding =
-            if (hasSecondaryY && config.showAxisLabels) config.paddingDp * density + 32f * density else config.paddingDp * density + 10f * density
+            if (hasSecondaryY && config.showAxisLabels) config.paddingDp * density + 32f * density else config.paddingDp * density + 18f * density
         val bottomPadding = if (config.showAxisLabels) {
-            config.paddingDp * density + (if (hasRotatedLabels) 50f * density else 16f * density)
+            config.paddingDp * density + (if (hasRotatedLabels) 60f * density else 16f * density)
         } else {
             config.paddingDp * density
         }
@@ -182,20 +190,21 @@ public class ChartEngine(
             viewWidth - leftPadding - rightPadding,
             density
         ) else 0f
-        val topPadding = config.paddingDp * density + legendHeight + 10f * density
+        val topPadding = config.paddingDp * density + legendHeight + 6f * density
+        val topHeadroom = 10f * density
 
         val drawWidth = (viewWidth - leftPadding - rightPadding).coerceAtLeast(1f)
-        val drawHeight = (viewHeight - topPadding - bottomPadding).coerceAtLeast(1f)
+        val drawHeight = (viewHeight - topPadding - bottomPadding - topHeadroom).coerceAtLeast(1f)
 
         val effectiveZoomX = maxOf(1f, config.zoomScaleX)
         val maxPanPixels = (drawWidth * effectiveZoomX - drawWidth).coerceAtLeast(0f)
         val clampedPanPixels = config.panOffsetX.coerceIn(0f, maxPanPixels)
 
         val visibleZoomY = maxOf(1f, config.zoomScaleY)
-        val visibleRangeY = if (visibleZoomY == 1f) range.rangeY else range.rangeY / visibleZoomY
-        val maxPanY = (range.rangeY - visibleRangeY).coerceAtLeast(0f)
+        val visibleRangeY = if (visibleZoomY == 1f) maxOf(1f, range.maxY) else maxOf(1f, range.maxY) / visibleZoomY
+        val maxPanY = (range.maxY - visibleRangeY).coerceAtLeast(0f)
         val clampedPanY = config.panOffsetY.coerceIn(0f, maxPanY)
-        val visibleMinY = range.minY + clampedPanY
+        val visibleMinY = clampedPanY
         val visibleMaxY = visibleMinY + visibleRangeY
 
         val tickResult = if (config.useNiceTicks) {
@@ -209,7 +218,7 @@ public class ChartEngine(
             )
         } else null
 
-        val effectiveMinY = tickResult?.niceMin ?: visibleMinY
+        val effectiveMinY = 0f
         val effectiveMaxY = tickResult?.niceMax ?: visibleMaxY
         val effectiveRangeY = (effectiveMaxY - effectiveMinY).coerceAtLeast(1f)
 
@@ -217,16 +226,13 @@ public class ChartEngine(
         var minDist = Float.MAX_VALUE
 
         for ((entries) in visibleDatasets) {
-            val dsEntryCount = entries.size
             for (idx in entries.indices) {
                 val entry = entries[idx]
-                val pctX = if (dsEntryCount > 1) {
-                    if (range.rangeX > 0f) (entry.x - range.minX) / range.rangeX else idx.toFloat() / (dsEntryCount - 1)
-                } else 0.5f
+                val pctX = entry.x / rangeX
 
                 val ex = leftPadding + (pctX * drawWidth * effectiveZoomX) - clampedPanPixels
-                val pctY = (entry.y - effectiveMinY) / effectiveRangeY
-                val ey = (topPadding + drawHeight) - (pctY * drawHeight)
+                val pctY = entry.y / effectiveRangeY
+                val ey = (topPadding + topHeadroom + drawHeight) - (pctY * drawHeight)
 
                 val dist = (screenX - ex) * (screenX - ex) + (screenY - ey) * (screenY - ey)
                 if (dist < minDist) {
