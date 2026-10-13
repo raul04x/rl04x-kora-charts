@@ -4,23 +4,28 @@ import android.content.res.Resources
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import androidx.core.graphics.toColorInt
 import com.rl04x.koracharts.core.model.ChartConfig
 import com.rl04x.koracharts.core.model.Dataset
 import com.rl04x.koracharts.core.renderer.helper.GlassTooltipRenderer
+import com.rl04x.koracharts.core.renderer.helper.LegendRenderer
 import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Renderer for Pie and Donut charts with glassmorphic tooltip badges and zero-allocation draw loops.
+ * Renderer for Pie and Donut charts with EVEN_ODD ring geometry, 360deg full circle safety,
+ * minimum slice angle safety, legend bar support, smart bounds callout text truncation,
+ * glass tooltip badges, perfect inner hole circularity, and zero-allocation draw loops.
  */
 public class PieRenderer(
     private val holeRadiusRatio: Float = 0.55f,
 ) : BaseRenderer<Dataset> {
 
     private val glassTooltipRenderer = GlassTooltipRenderer()
+    private val legendRenderer = LegendRenderer()
 
     private val slicePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val holePaint =
@@ -38,8 +43,9 @@ public class PieRenderer(
         Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1.2f }
     private val calloutTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 10f }
 
-    private val cachedOval = RectF()
-    private val cachedShiftedOval = RectF()
+    private val cachedOuterOval = RectF()
+    private val cachedInnerOval = RectF()
+    private val slicePath = Path()
 
     private class CalloutItem(
         var p1x: Float = 0f,
@@ -78,7 +84,12 @@ public class PieRenderer(
     ) {
         if (data.isEmpty() || width <= 0f || height <= 0f) return
 
-        holePaint.color = config.style.cardBackgroundColor
+        val bgColor = if (Color.alpha(config.style.cardBackgroundColor) > 0) {
+            config.style.cardBackgroundColor
+        } else {
+            "#0F172A".toColorInt()
+        }
+        holePaint.color = bgColor
         centerTitlePaint.color = config.style.titleTextColor
         centerSubtitlePaint.color = config.style.subtitleTextColor
 
@@ -90,34 +101,56 @@ public class PieRenderer(
         rightCalloutCount = 0
         leftCalloutCount = 0
 
-        val padding = config.paddingDp * density
-        val outerMargin = 12f * density
-        val availableSize = minOf(width, height) - (padding * 2f) - (outerMargin * 2f)
-        val size = maxOf(availableSize, 40f * density)
-
-        val radius = size / 2f
-        val centerX = width / 2f
-        val centerY = height / 2f
-
-        val isDonut = holeRadiusRatio > 0f
-        val ringWidth = if (isDonut) radius * (1f - holeRadiusRatio) else 0f
-        val midRadius = if (isDonut) radius * (1f + holeRadiusRatio) / 2f else radius
-
-        if (isDonut) {
-            cachedOval.set(
-                centerX - midRadius,
-                centerY - midRadius,
-                centerX + midRadius,
-                centerY + midRadius
-            )
-        } else {
-            cachedOval.set(centerX - radius, centerY - radius, centerX + radius, centerY + radius)
-        }
-
         val firstDataset = data.firstOrNull()
         val entries = firstDataset?.entries ?: return
         val total = entries.sumOf { it.y.toDouble() }.toFloat()
         if (total <= 0f) return
+
+        val padding = config.paddingDp * density
+        val hasLegend = config.showLegend && entries.isNotEmpty()
+
+        val legendLabels = if (hasLegend) {
+            entries.mapIndexed { i, e -> e.label?.substringBefore('\n') ?: "Category ${i + 1}" }
+        } else emptyList()
+
+        val legendColors = if (hasLegend) {
+            entries.indices.map { i ->
+                entries[i].color ?: firstDataset.colors?.getOrNull(i)
+                ?: defaultColors[i % defaultColors.size]
+            }
+        } else emptyList()
+
+        val legendHeight = if (hasLegend) {
+            legendRenderer.calculateLegendHeight(legendLabels, width - (padding * 2f), density)
+        } else 0f
+
+        if (hasLegend) {
+            legendRenderer.drawLegend(
+                canvas = canvas,
+                labels = legendLabels,
+                colors = legendColors,
+                startX = padding,
+                startY = padding,
+                maxLegendWidth = width - (padding * 2f),
+                config = config,
+                density = density,
+            )
+        }
+
+        val topMargin = if (hasLegend) padding + legendHeight + 6f * density else padding
+        val outerMargin =
+            if (config.showAxisLabels && entries.size > 2) 28f * density else 12f * density
+        val availableSize =
+            minOf(width - (padding * 2f), height - topMargin - padding) - (outerMargin * 2f)
+        val size = maxOf(availableSize, 40f * density)
+
+        val radius = size / 2f
+        val centerX = width / 2f
+        val centerY =
+            topMargin + outerMargin + radius + (height - topMargin - outerMargin * 2f - radius * 2f) / 2f
+
+        val isDonut = holeRadiusRatio > 0f
+        val holeRadius = if (isDonut) radius * holeRadiusRatio else 0f
 
         var startAngle = -90f
         var selectedBadgeText: String? = null
@@ -125,7 +158,9 @@ public class PieRenderer(
         var selectedBadgeY = 0f
 
         for ((idx, entry) in entries.withIndex()) {
-            val sweepAngle = (entry.y / total) * 360f * progress
+            val fullSweep = (entry.y / total) * 360f
+            val rawSweepAngle = fullSweep * progress
+            val sweepAngle = if (rawSweepAngle in 0.001f..2.999f) 3f else rawSweepAngle
             val isSelected = (config.selectedEntry == entry)
             val midAngleRad = Math.toRadians((startAngle + sweepAngle / 2f).toDouble())
 
@@ -133,28 +168,59 @@ public class PieRenderer(
                 ?: firstDataset.colors?.getOrNull(idx)
                 ?: defaultColors[idx % defaultColors.size]
 
-            slicePaint.color = sliceColor
+            val explosionDist = if (isSelected) 5f * density else 0f
+            val shiftX = (explosionDist * cos(midAngleRad)).toFloat()
+            val shiftY = (explosionDist * sin(midAngleRad)).toFloat()
+
+            val sliceCenterX = centerX + shiftX
+            val sliceCenterY = centerY + shiftY
+
+            slicePath.reset()
+            slicePath.fillType = Path.FillType.EVEN_ODD
+
             if (isDonut) {
-                slicePaint.style = Paint.Style.STROKE
-                slicePaint.strokeWidth = ringWidth
-            } else {
-                slicePaint.style = Paint.Style.FILL
-            }
-
-            if (isSelected) {
-                val explosionDist = 14f * density
-                val shiftX = (explosionDist * cos(midAngleRad)).toFloat()
-                val shiftY = (explosionDist * sin(midAngleRad)).toFloat()
-
-                cachedShiftedOval.set(
-                    cachedOval.left + shiftX,
-                    cachedOval.top + shiftY,
-                    cachedOval.right + shiftX,
-                    cachedOval.bottom + shiftY,
+                cachedOuterOval.set(
+                    sliceCenterX - radius,
+                    sliceCenterY - radius,
+                    sliceCenterX + radius,
+                    sliceCenterY + radius
+                )
+                cachedInnerOval.set(
+                    sliceCenterX - holeRadius,
+                    sliceCenterY - holeRadius,
+                    sliceCenterX + holeRadius,
+                    sliceCenterY + holeRadius
                 )
 
-                canvas.drawArc(cachedShiftedOval, startAngle, sweepAngle, !isDonut, slicePaint)
+                if (sweepAngle >= 359f) {
+                    slicePath.addOval(cachedOuterOval, Path.Direction.CW)
+                    slicePath.addOval(cachedInnerOval, Path.Direction.CW)
+                } else {
+                    slicePath.arcTo(cachedOuterOval, startAngle, sweepAngle)
+                    slicePath.arcTo(cachedInnerOval, startAngle + sweepAngle, -sweepAngle)
+                    slicePath.close()
+                }
+            } else {
+                cachedOuterOval.set(
+                    sliceCenterX - radius,
+                    sliceCenterY - radius,
+                    sliceCenterX + radius,
+                    sliceCenterY + radius
+                )
+                if (sweepAngle >= 359f) {
+                    slicePath.addOval(cachedOuterOval, Path.Direction.CW)
+                } else {
+                    slicePath.moveTo(sliceCenterX, sliceCenterY)
+                    slicePath.arcTo(cachedOuterOval, startAngle, sweepAngle, false)
+                    slicePath.close()
+                }
+            }
 
+            slicePaint.style = Paint.Style.FILL
+            slicePaint.color = sliceColor
+            canvas.drawPath(slicePath, slicePaint)
+
+            if (isSelected) {
                 val badgeRadius = radius + 20f * density
                 selectedBadgeX = (centerX + shiftX + badgeRadius * cos(midAngleRad)).toFloat()
                 selectedBadgeY = (centerY + shiftY + badgeRadius * sin(midAngleRad)).toFloat()
@@ -165,8 +231,6 @@ public class PieRenderer(
                 } else {
                     "$baseLabel: ${String.format(Locale.US, "%.0f%%", pct)}"
                 }
-            } else {
-                canvas.drawArc(cachedOval, startAngle, sweepAngle, !isDonut, slicePaint)
             }
 
             if (config.showAxisLabels && progress >= 0.8f && !isSelected) {
@@ -174,9 +238,11 @@ public class PieRenderer(
                 val pctText = String.format(Locale.US, "%.0f%%", pct)
 
                 if (sweepAngle > 18f) {
-                    val labelRadius = if (isDonut) midRadius else radius * 0.65f
-                    val lx = (centerX + labelRadius * cos(midAngleRad)).toFloat()
-                    val ly = (centerY + labelRadius * sin(midAngleRad)).toFloat() + 4f * density
+                    val midRadius =
+                        if (isDonut) radius * (1f + holeRadiusRatio) / 2f else radius * 0.65f
+                    val lx = (centerX + shiftX + midRadius * cos(midAngleRad)).toFloat()
+                    val ly =
+                        (centerY + shiftY + midRadius * sin(midAngleRad)).toFloat() + 4f * density
 
                     val calculatedContrastColor =
                         com.rl04x.koracharts.core.util.NumberFormatterUtils.calculateHarmoniousContrastColor(
@@ -187,11 +253,11 @@ public class PieRenderer(
                         entry.textColor ?: firstDataset.labelTextColor ?: calculatedContrastColor
                     canvas.drawText(pctText, lx, ly, labelPaint)
                 } else if (sweepAngle > 1f) {
-                    val p1x = (centerX + radius * cos(midAngleRad)).toFloat()
-                    val p1y = (centerY + radius * sin(midAngleRad)).toFloat()
+                    val p1x = (centerX + shiftX + radius * cos(midAngleRad)).toFloat()
+                    val p1y = (centerY + shiftY + radius * sin(midAngleRad)).toFloat()
                     val lineDist = 12f * density
-                    val p2x = (centerX + (radius + lineDist) * cos(midAngleRad)).toFloat()
-                    val p2y = (centerY + (radius + lineDist) * sin(midAngleRad)).toFloat()
+                    val p2x = (centerX + shiftX + (radius + lineDist) * cos(midAngleRad)).toFloat()
+                    val p2y = (centerY + shiftY + (radius + lineDist) * sin(midAngleRad)).toFloat()
 
                     val isRightSide = cos(midAngleRad) >= 0
                     val textColor = entry.textColor ?: config.style.labelTextColor
@@ -244,17 +310,14 @@ public class PieRenderer(
                 }
             }
 
-            startAngle += (entry.y / total) * 360f
+            startAngle += rawSweepAngle
         }
 
-        drawCallouts(canvas, rightCallouts, rightCalloutCount, height, density)
-        drawCallouts(canvas, leftCallouts, leftCalloutCount, height, density)
+        drawCallouts(canvas, rightCallouts, rightCalloutCount, height, width, density)
+        drawCallouts(canvas, leftCallouts, leftCalloutCount, height, width, density)
 
         if (isDonut) {
-            val holeRadius = radius * holeRadiusRatio
-            if (Color.alpha(config.style.cardBackgroundColor) > 0) {
-                canvas.drawCircle(centerX, centerY, holeRadius, holePaint)
-            }
+            canvas.drawCircle(centerX, centerY, holeRadius, holePaint)
 
             val maxTextWidth = holeRadius * 1.6f
             val selected = config.selectedEntry
@@ -319,6 +382,7 @@ public class PieRenderer(
         callouts: List<CalloutItem>,
         count: Int,
         height: Float,
+        width: Float,
         density: Float,
     ) {
         if (count == 0) return
@@ -351,6 +415,8 @@ public class PieRenderer(
             }
         }
 
+        calloutTextPaint.textSize = 10f * density
+
         for (i in 0 until count) {
             val item = items[i]
             val adjustedY = resultY[i]
@@ -366,12 +432,29 @@ public class PieRenderer(
             val tx = if (item.isRightSide) p3x + 4f * density else p3x - 4f * density
             val ty = adjustedY + 3.5f * density
 
+            val maxTextWidth = if (item.isRightSide) {
+                (width - 6f * density - tx).coerceAtLeast(20f * density)
+            } else {
+                (tx - 6f * density).coerceAtLeast(20f * density)
+            }
+
+            var formattedText = item.text
+            if (calloutTextPaint.measureText(formattedText) > maxTextWidth) {
+                val pctPart = item.text.substringAfterLast(':', "")
+                val namePart = item.text.substringBeforeLast(':', item.text)
+
+                var truncName = namePart
+                while (truncName.length > 2 && calloutTextPaint.measureText("$truncName…:$pctPart") > maxTextWidth) {
+                    truncName = truncName.dropLast(1)
+                }
+                formattedText = if (pctPart.isNotEmpty()) "$truncName…:$pctPart" else "$truncName…"
+            }
+
             calloutTextPaint.color = item.textColor
-            calloutTextPaint.textSize = 10f * density
             calloutTextPaint.textAlign =
                 if (item.isRightSide) Paint.Align.LEFT else Paint.Align.RIGHT
 
-            canvas.drawText(item.text, tx, ty, calloutTextPaint)
+            canvas.drawText(formattedText, tx, ty, calloutTextPaint)
         }
     }
 }

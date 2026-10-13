@@ -105,6 +105,24 @@
                 app:kora_showAxisLabels="true" />
         </com.rl04x.koracharts.views.KoraChartCardView>
 
+        <!-- 4b. Income Distribution Asymmetric Donut XML View Card -->
+        <com.rl04x.koracharts.views.KoraChartCardView
+            android:id="@+id/card4b"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:kora_cardBadgeText="99% / 1%"
+            app:kora_cardSubtitle="Sueldo (€2,308 · 99%) vs Otros (€23 · 1%)"
+            app:kora_cardTitle="Salary &amp; Income Distribution">
+
+            <com.rl04x.koracharts.views.KoraPieChartView
+                android:id="@+id/incomePieChartView"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                app:kora_animationDuration="600"
+                app:kora_showAxisLabels="true" />
+        </com.rl04x.koracharts.views.KoraChartCardView>
+
         <!-- 5. Stacked Bar Chart XML View Card -->
         <com.rl04x.koracharts.views.KoraChartCardView
             android:id="@+id/card5"
@@ -190,6 +208,10 @@
                 android:id="@+id/bubbleChartView"
                 android:layout_width="match_parent"
                 android:layout_height="220dp"
+                app:kora_animationDuration="600"
+                app:kora_enableZoom="true"
+                app:kora_showAxisLabels="true"
+                app:kora_showGrid="true" />
                 app:kora_animationDuration="600"
                 app:kora_showAxisLabels="true"
                 app:kora_showGrid="true" />

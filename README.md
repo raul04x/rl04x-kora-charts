@@ -10,10 +10,14 @@
 
 - **📐 Cartesian Plane Origin $(0, 0)$ & Flat Base Bars:**
   - Strict Cartesian coordinate system originating at $(0,0)$ with $0 \le x \le M$ and $0 \le y \le N$. Points with $x > 0$ are visibly displaced from origin $X=0$.
-  - Vertical bar charts render flat bottom bases anchored at $Y=0$ with top-only rounded corners.
+  - Vertical bar charts render flat bottom bases anchored at $Y=0$ with top-only rounded corners and individual per-bar custom colors (`entry.color`).
 
 - **⚡ Zero-Allocation Canvas Engine:**
   - Re-architected modular sub-renderers (`AxisGridRenderer`, `LegendRenderer`, `GlassTooltipRenderer`) with pre-allocated buffer recycling for zero Garbage Collection (GC) pressure at 60/120 FPS.
+
+- **🍩 EVEN_ODD Donut Geometry & Smart Bounds Callout Truncation:**
+  - Closed path ring rendering with `FillType.EVEN_ODD` for 100% Skia GPU compatibility and $360^\circ$ full circle / single-entry safety.
+  - Automatic callout text truncation with ellipsis (`"Odontolo…: 4%"`) preserving percentage visibility without edge clipping.
 
 - **🪟 Translucent Glass Tooltips:**
   - Glass badges featuring 85% translucency (`0xD9`) and clean left-aligned multi-line (`\n`) text formatting.
@@ -21,14 +25,14 @@
 
 - **📊 9 Chart Types Supported:**
   1. **Line Chart** (`KoraLineChart`) — Smooth bezier curves with gradient fills, node points, and crosshair highlight lines.
-  2. **Bar Chart** (`KoraBarChart`) — Vertical rounded bars with $Y = 0$ flat-anchored baselines, top-only rounded corners, and highlight borders.
+  2. **Bar Chart** (`KoraBarChart`) — Vertical rounded bars with $Y = 0$ flat-anchored baselines, top-only rounded corners, individual per-entry colors, and highlight borders.
   3. **Horizontal Bar Chart** (`KoraHorizontalBarChart`) — Horizontal progress bars with track backgrounds and value labels.
-  4. **Donut & Pie Chart** (`KoraPieChart`) — Donut chart with true ring rendering, Google WCAG contrast text, and auto-scaling center hole text.
+  4. **Donut & Pie Chart** (`KoraPieChart`) — Donut chart with true ring rendering, Google WCAG contrast text, auto-scaling center hole text, and smart bounds callouts.
   5. **Stacked Bar Chart** (`KoraStackedBarChart`) — Multi-segment stacked bars supporting 480+ entries (e.g. credit loan schedules), top-only rounded corners, multi-row legend wrapping, and segment breakdown cards.
-  6. **Candlestick Chart** (`KoraCandlestickChart`) — Financial candlestick chart with high/low wicks and bullish/bearish candle bodies.
+  6. **Candlestick Chart** (`KoraCandlestickChart`) — Financial candlestick chart with high/low wicks, bullish/bearish candle bodies, and 2D Zoom/Pan.
   7. **Radar / Spider Chart** (`KoraRadarChart`) — Multi-axis polygon web chart comparing datasets across skill categories.
-  8. **Combined Chart** (`KoraCombinedChart`) — Dual-layer chart overlaying vertical bars and line curves with node dots.
-  9. **Bubble Scatter Plot** (`KoraBubbleChart`) — Translucent bubble scatter plot with variable positions, radii, and colors.
+  8. **Combined Chart** (`KoraCombinedChart`) — Dual-layer chart overlaying vertical bars and line curves with node dots and subpixel 1-to-1 alignment.
+  9. **Bubble Scatter Plot** (`KoraBubbleChart`) — Translucent 2D Euclidean scatter plot with 2D Zoom/Pan and top/lateral headroom clipping immunity.
 
 - **🔢 Mathematical Axis Scaling & Nice Numbers (`AxisTickCalculator`):**
   - Automatically calculates clean, whole-number axis intervals ($1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, \dots$).
@@ -90,13 +94,13 @@ dependencyResolutionManagement {
 ```kotlin
 dependencies {
     // For Jetpack Compose components
-    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-compose:1.0.0-beta03")
+    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-compose:1.0.0-beta04")
 
     // Core charting engine
-    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-core:1.0.0-beta03")
+    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-core:1.0.0-beta04")
 
     // For Android Views XML support (optional)
-    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-views:1.0.0-beta03")
+    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-views:1.0.0-beta04")
 }
 ```
 

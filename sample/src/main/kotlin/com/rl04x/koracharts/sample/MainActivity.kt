@@ -49,7 +49,10 @@ import com.rl04x.koracharts.compose.KoraLineChart
 import com.rl04x.koracharts.compose.KoraPieChart
 import com.rl04x.koracharts.compose.KoraRadarChart
 import com.rl04x.koracharts.compose.KoraStackedBarChart
+import com.rl04x.koracharts.core.model.BubbleEntry
+import com.rl04x.koracharts.core.model.CandlestickEntry
 import com.rl04x.koracharts.core.model.ChartConfig
+import com.rl04x.koracharts.core.model.Dataset
 import com.rl04x.koracharts.core.model.KoraChartStyle
 import com.rl04x.koracharts.core.model.StackedBarEntry
 import com.rl04x.koracharts.sample.databinding.ActivityXmlViewsGalleryBinding
@@ -126,6 +129,7 @@ fun DashboardScreen() {
     val (categoryData, _) = remember { SampleData.generateCategorySalesBarData() }
     val latencyData = remember { SampleData.generateDatabaseLatencyHorizontalData() }
     val browserData = remember { SampleData.generateBrowserSharePieData() }
+    val incomeData = remember { SampleData.generateIncomeDistributionDonutData() }
     val channelData = remember { SampleData.generateSalesChannelStackedData() }
     val cryptoData = remember { SampleData.generateCryptoCandlestickData() }
     val devRadarData = remember { SampleData.generateDeveloperRadarData() }
@@ -421,6 +425,10 @@ fun DashboardScreen() {
                             browserData,
                             chartConfig.copy(centerTitle = "52%", centerSubtitle = "Chrome")
                         )
+                        binding.incomePieChartView.setData(
+                            incomeData,
+                            chartConfig.copy(centerTitle = "52%", centerSubtitle = "Chrome")
+                        )
                         binding.stackedBarChartView.setData(channelData, chartConfig)
                         binding.stackedBarChartView.onBarSelectedListener = { entry ->
                             if (entry != null) {
@@ -553,9 +561,12 @@ fun DashboardScreen() {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // 3. Horizontal Bar Chart: Database Engine Latency
+                var selectedHorizontalBar by remember { mutableStateOf<Dataset?>(null) }
                 KoraChartCard(
                     title = "Database Engine Latency",
-                    subtitle = "Average response time (ms)",
+                    subtitle = selectedHorizontalBar?.let { "${it.label}: ${it.entries.firstOrNull()?.y?.toInt()} ms" }
+                        ?: "Average response time (ms) · Tap to select",
+                    badgeText = selectedHorizontalBar?.let { "Selected: ${it.label}" } ?: "Latency",
                     chartHeight = selectedHeightDp.dp,
                     style = chartStyle,
                     modifier = Modifier.fillMaxWidth(),
@@ -564,6 +575,7 @@ fun DashboardScreen() {
                         datasets = latencyData,
                         config = chartConfig,
                         modifier = Modifier.fillMaxSize(),
+                        onBarSelected = { selectedHorizontalBar = it },
                     )
                 }
 
@@ -582,7 +594,32 @@ fun DashboardScreen() {
                         config = chartConfig.copy(
                             centerTitle = "52%",
                             centerSubtitle = "Chrome",
+                            showLegend = false
                         ),
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 4b. Income Distribution Asymmetric Donut Chart (99% vs 1%)
+                val incomeData = remember { SampleData.generateIncomeDistributionDonutData() }
+                KoraChartCard(
+                    title = "Salary & Income Distribution",
+                    subtitle = "Sueldo (€2,308 · 99%) vs Otros (€23 · 1%)",
+                    badgeText = "99% / 1%",
+                    chartHeight = selectedHeightDp.dp,
+                    style = chartStyle,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    KoraPieChart(
+                        datasets = incomeData,
+                        config = chartConfig.copy(
+                            centerTitle = "Total",
+                            centerSubtitle = "€2,331",
+                            showLegend = false
+                        ),
+                        holeRadius = 0.58f,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -618,10 +655,13 @@ fun DashboardScreen() {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // 6. Candlestick Chart: KORA / USD Quote
+                var selectedCandle by remember { mutableStateOf<CandlestickEntry?>(null) }
                 KoraChartCard(
                     title = "KORA / USD Quote",
-                    subtitle = "Daily candles",
-                    badgeText = "+8.5%",
+                    subtitle = selectedCandle?.let {
+                        "${it.label}: Open $${it.open.toInt()} · High $${it.high.toInt()} · Low $${it.low.toInt()} · Close $${it.close.toInt()}"
+                    } ?: "Daily candles · Tap to inspect",
+                    badgeText = selectedCandle?.let { "Close: $${it.close.toInt()}" } ?: "+8.5%",
                     chartHeight = selectedHeightDp.dp,
                     style = chartStyle,
                     modifier = Modifier.fillMaxWidth(),
@@ -630,6 +670,7 @@ fun DashboardScreen() {
                         candles = cryptoData,
                         config = chartConfig,
                         modifier = Modifier.fillMaxSize(),
+                        onCandleSelected = { selectedCandle = it },
                     )
                 }
 
@@ -653,9 +694,13 @@ fun DashboardScreen() {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // 8. Combined Chart: Active Users vs Conversions
+                var selectedCombinedPoint by remember { mutableStateOf<Pair<Float, Float>?>(null) }
                 KoraChartCard(
                     title = "Active Users vs Conversions",
-                    subtitle = "Bars: Users · Line: Conversions",
+                    subtitle = selectedCombinedPoint?.let { "Selected: Day ${it.first.toInt()} · Value: ${it.second.toInt()}" }
+                        ?: "Bars: Users · Line: Conversions · Tap point",
+                    badgeText = selectedCombinedPoint?.let { "Val: ${it.second.toInt()}" }
+                        ?: "Combined",
                     chartHeight = selectedHeightDp.dp,
                     style = chartStyle,
                     modifier = Modifier.fillMaxWidth(),
@@ -664,15 +709,19 @@ fun DashboardScreen() {
                         datasets = userTrafficData,
                         config = chartConfig,
                         modifier = Modifier.fillMaxSize(),
+                        onPointSelected = { x, y -> selectedCombinedPoint = Pair(x, y) },
                     )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // 9. Bubble Chart: Project Portfolio Matrix
+                var selectedBubble by remember { mutableStateOf<BubbleEntry?>(null) }
                 KoraChartCard(
                     title = "Project Portfolio Matrix",
-                    subtitle = "X: Risk · Y: Return · Radius: Budget",
+                    subtitle = selectedBubble?.let { "${it.label}: Risk ${it.x.toInt()} · Return ${it.y.toInt()} · Budget €${it.radiusDp.toInt()}k" }
+                        ?: "X: Risk · Y: Return · Radius: Budget · Tap bubble",
+                    badgeText = selectedBubble?.let { "Selected: ${it.label}" } ?: "Matrix",
                     chartHeight = selectedHeightDp.dp,
                     style = chartStyle,
                     modifier = Modifier.fillMaxWidth(),
@@ -681,6 +730,7 @@ fun DashboardScreen() {
                         bubbles = riskData,
                         config = chartConfig,
                         modifier = Modifier.fillMaxSize(),
+                        onBubbleSelected = { selectedBubble = it },
                     )
                 }
             }

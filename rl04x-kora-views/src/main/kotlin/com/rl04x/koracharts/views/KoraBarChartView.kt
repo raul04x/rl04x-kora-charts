@@ -10,6 +10,7 @@ import com.rl04x.koracharts.core.animation.LinearAnimator
 import com.rl04x.koracharts.core.engine.ChartEngine
 import com.rl04x.koracharts.core.model.ChartConfig
 import com.rl04x.koracharts.core.model.Dataset
+import com.rl04x.koracharts.core.model.Entry
 import com.rl04x.koracharts.core.renderer.BarRenderer
 import kotlin.math.abs
 
@@ -27,6 +28,8 @@ public class KoraBarChartView @JvmOverloads constructor(
     private val renderer = BarRenderer()
     private val animator = LinearAnimator()
     private var animProgress: Float = 1f
+
+    public var onBarSelectedListener: ((entry: Entry?) -> Unit)? = null
 
     private val scaleGestureDetector =
         ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
@@ -169,7 +172,7 @@ public class KoraBarChartView @JvmOverloads constructor(
             val density = resources.displayMetrics.density
             val leftPadding =
                 if (config.showAxisLabels) config.paddingDp * density + 28f * density else config.paddingDp * density
-            val rightPadding = config.paddingDp * density
+            val rightPadding = config.paddingDp * density + 10f * density
             val drawWidth = width.toFloat() - leftPadding - rightPadding
 
             val visibleDatasets = datasets.filter { it.visible && it.entries.isNotEmpty() }
@@ -182,8 +185,10 @@ public class KoraBarChartView @JvmOverloads constructor(
                     val clickedBar = visibleDatasets.first().entries.getOrNull(clickedIdx)
                     if (clickedBar != null) {
                         config = if (config.selectedEntry == clickedBar) {
+                            onBarSelectedListener?.invoke(null)
                             config.copy(selectedEntry = null)
                         } else {
+                            onBarSelectedListener?.invoke(clickedBar)
                             config.copy(selectedEntry = clickedBar)
                         }
                         performClick()
@@ -191,6 +196,7 @@ public class KoraBarChartView @JvmOverloads constructor(
                     }
                 } else {
                     config = config.copy(selectedEntry = null)
+                    onBarSelectedListener?.invoke(null)
                     performClick()
                     invalidate()
                 }

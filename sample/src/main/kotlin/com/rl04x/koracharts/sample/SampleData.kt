@@ -78,14 +78,29 @@ object SampleData {
         return Pair(listOf(currentDataset, previousDataset), currentEntries[19]) // Day 20 selected
     }
 
-    // 2. Bar Chart: Product Sales
+    // 2. Bar Chart: Product Sales with Vibrant Multi-Color Palette
     fun generateCategorySalesBarData(): Pair<List<Dataset>, Entry> {
         val categories =
             listOf("Electronics", "Clothing", "Home", "Sports", "Books", "Toys", "Beauty", "Auto")
         val values = listOf(42f, 65f, 52f, 88f, 70f, 95f, 60f, 78f)
+        val colors = listOf(
+            cyanColor,        // Electronics (#2DD4BF)
+            emeraldColor,     // Clothing (#10B981)
+            blueColor,        // Home (#3B82F6)
+            purpleColor,      // Sports (#8B5CF6)
+            lightPurpleColor, // Books (#A78BFA)
+            yellowColor,      // Toys (#F59E0B)
+            coralColor,       // Beauty (#F87171)
+            tealColor,        // Auto (#14B8A6)
+        )
 
         val entries = categories.mapIndexed { idx, cat ->
-            Entry(idx.toFloat(), values[idx], "$cat\nSales: €${values[idx].toInt()}k\nTarget: €80k")
+            Entry(
+                x = idx.toFloat(),
+                y = values[idx],
+                label = "$cat\nSales: €${values[idx].toInt()}k\nTarget: €80k",
+                color = colors[idx]
+            )
         }
         val selectedEntry = entries[5]
 
@@ -135,6 +150,15 @@ object SampleData {
 
     fun generateBrowserSharePieData(): List<Dataset> = generateMarketSharePieData()
 
+    // 4b. Donut Data: Extreme Asymmetric Donut (Sueldo 99% vs Otros 1%)
+    fun generateIncomeDistributionDonutData(): List<Dataset> {
+        val entries = listOf(
+            Entry(0f, 2308f, "Sueldo", color = emeraldColor),
+            Entry(1f, 23.3f, "Otros", color = coralColor),
+        )
+        return listOf(Dataset(entries = entries))
+    }
+
     // 5. Stacked Bar Data: French Amortization Method Credit (60 Months - Fixed Payment, Decreasing Interest, Increasing Principal)
     fun generateFrenchAmortization60MonthsData(): List<StackedBarEntry> {
         val loanAmount = 10000f
@@ -173,9 +197,6 @@ object SampleData {
 
         return entries
     }
-
-    fun generateQuarterlyRevenueStackedData(): List<StackedBarEntry> =
-        generateFrenchAmortization60MonthsData()
 
     fun generateSalesChannelStackedData(): List<StackedBarEntry> =
         generateFrenchAmortization60MonthsData()

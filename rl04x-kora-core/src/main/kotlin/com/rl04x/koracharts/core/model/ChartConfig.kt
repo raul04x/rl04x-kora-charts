@@ -9,7 +9,7 @@ public data class ChartConfig(
     val showGrid: Boolean = true,
     val showVerticalGrid: Boolean = false,
     val showAxes: Boolean = true,
-    val showLegend: Boolean = true,
+    val showLegend: Boolean = false,
     val showTooltip: Boolean = true,
     val animationDuration: Long = 600L,
     val paddingDp: Float = 16f,

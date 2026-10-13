@@ -16,7 +16,7 @@ import com.rl04x.koracharts.core.renderer.helper.LegendRenderer
 import java.util.Locale
 
 /**
- * Renderer for Bar Charts with top-only rounded corners (flat base), Glassmorphic badge overlays,
+ * Renderer for Bar Charts with top-only rounded corners (flat base), individual per-entry colors, Glass badge overlays,
  * top headroom for capped axes, smart X label vertical -90deg rotation aligned to bar base center, and Y=0 anchored baselines.
  */
 public class BarRenderer : BaseRenderer<Dataset> {
@@ -80,7 +80,8 @@ public class BarRenderer : BaseRenderer<Dataset> {
         val entryCount = firstDataset.entries.size
 
         tempMeasurePaint.textSize = 10f * density
-        val drawWidthEstimate = (width - (config.paddingDp * density * 2f) - 38f * density).coerceAtLeast(1f)
+        val drawWidthEstimate =
+            (width - (config.paddingDp * density * 2f) - 38f * density).coerceAtLeast(1f)
         val estimatedSlotWidth = (drawWidthEstimate / entryCount).coerceAtLeast(1f)
 
         val hasRotatedLabels = config.showAxisLabels && (
@@ -263,7 +264,8 @@ public class BarRenderer : BaseRenderer<Dataset> {
                     val barTop =
                         (baselineY - barHeight).coerceIn(topPadding + topHeadroom, baselineY)
 
-                    barPaint.color = dataset.color
+                    // Individual per-entry color or dataset color
+                    barPaint.color = entry.color ?: dataset.color
                     cachedBarRect.set(barLeft, barTop, barRight, baselineY)
 
                     barPath.reset()
