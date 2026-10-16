@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import androidx.core.graphics.toColorInt
+import com.rl04x.koracharts.core.engine.PieChartLayout
 import com.rl04x.koracharts.core.model.ChartConfig
 import com.rl04x.koracharts.core.model.Dataset
 import com.rl04x.koracharts.core.renderer.helper.GlassTooltipRenderer
@@ -57,7 +58,8 @@ public class PieRenderer(
         var isRightSide: Boolean = true,
         var sliceColor: Int = 0,
         var textColor: Int = 0,
-        var text: String = "",
+        var category: String = "",
+        var percentage: String = "",
     )
 
     private val rightCallouts =
@@ -139,17 +141,18 @@ public class PieRenderer(
             )
         }
 
-        val topMargin = if (hasLegend) padding + legendHeight + 6f * density else padding
-        val outerMargin =
-            if (config.showAxisLabels && entries.size > 2) 28f * density else 12f * density
-        val availableSize =
-            minOf(width - (padding * 2f), height - topMargin - padding) - (outerMargin * 2f)
-        val size = maxOf(availableSize, 40f * density)
-
-        val radius = size / 2f
-        val centerX = width / 2f
-        val centerY =
-            topMargin + outerMargin + radius + (height - topMargin - outerMargin * 2f - radius * 2f) / 2f
+        val layout = PieChartLayout.calculate(
+            width = width,
+            height = height,
+            paddingPx = padding,
+            density = density,
+            entryCount = entries.size,
+            config = config,
+            legendHeight = legendHeight,
+        )
+        val radius = layout.radius
+        val centerX = layout.centerX
+        val centerY = layout.centerY
 
         val isDonut = holeRadiusRatio > 0f
         val holeRadius = if (isDonut) radius * holeRadiusRatio else 0f
@@ -227,19 +230,14 @@ public class PieRenderer(
                 selectedBadgeX = (centerX + shiftX + badgeRadius * cos(midAngleRad)).toFloat()
                 selectedBadgeY = (centerY + shiftY + badgeRadius * sin(midAngleRad)).toFloat()
                 val pct = (entry.y / total) * 100f
-                val baseLabel = entry.label ?: "Item"
+                val categoryLabel = entry.label?.substringBefore('\n') ?: "Item"
                 val formattedVal = formatValue(entry.y, config)
-                selectedBadgeText = if (baseLabel.contains("\n")) {
-                    baseLabel
-                } else {
-                    "$baseLabel: $formattedVal (${formatPercentage(pct)})"
-                }
+                selectedBadgeText = "$categoryLabel\n$formattedVal (${formatPercentage(pct)})"
             }
 
             if (config.showAxisLabels && progress >= 0.8f && !isSelected) {
                 val pct = (entry.y / total) * 100f
                 val pctText = formatPercentage(pct)
-                val formattedVal = formatValue(entry.y, config)
 
                 if (sweepAngle > 18f) {
                     val midRadius =
@@ -257,6 +255,7 @@ public class PieRenderer(
                         entry.textColor ?: firstDataset.labelTextColor ?: calculatedContrastColor
                     canvas.drawText(pctText, lx, ly, labelPaint)
                 } else if (sweepAngle > 1f) {
+                    val categoryLabel = entry.label?.substringBefore('\n') ?: "Item"
                     val p1x = (centerX + shiftX + radius * cos(midAngleRad)).toFloat()
                     val p1y = (centerY + shiftY + radius * sin(midAngleRad)).toFloat()
                     val lineDist = 12f * density
@@ -265,16 +264,13 @@ public class PieRenderer(
 
                     val isRightSide = cos(midAngleRad) >= 0
                     val textColor = entry.textColor ?: config.style.labelTextColor
-                    val displayText =
-                        entry.label?.substringBefore('\n')?.let { "$it: $formattedVal ($pctText)" }
-                            ?: "$formattedVal ($pctText)"
 
                     if (isRightSide) {
                         if (rightCalloutCount < rightCallouts.size) {
                             val item = rightCallouts[rightCalloutCount]
                             item.p1x = p1x; item.p1y = p1y; item.p2x = p2x; item.rawP2y = p2y
                             item.isRightSide = true; item.sliceColor = sliceColor; item.textColor =
-                                textColor; item.text = displayText
+                                textColor; item.category = categoryLabel; item.percentage = pctText
                         } else {
                             rightCallouts.add(
                                 CalloutItem(
@@ -285,7 +281,8 @@ public class PieRenderer(
                                     true,
                                     sliceColor,
                                     textColor,
-                                    displayText
+                                    categoryLabel,
+                                    pctText
                                 )
                             )
                         }
@@ -295,7 +292,7 @@ public class PieRenderer(
                             val item = leftCallouts[leftCalloutCount]
                             item.p1x = p1x; item.p1y = p1y; item.p2x = p2x; item.rawP2y = p2y
                             item.isRightSide = false; item.sliceColor = sliceColor; item.textColor =
-                                textColor; item.text = displayText
+                                textColor; item.category = categoryLabel; item.percentage = pctText
                         } else {
                             leftCallouts.add(
                                 CalloutItem(
@@ -306,7 +303,8 @@ public class PieRenderer(
                                     false,
                                     sliceColor,
                                     textColor,
-                                    displayText
+                                    categoryLabel,
+                                    pctText
                                 )
                             )
                         }
@@ -468,16 +466,20 @@ public class PieRenderer(
                 (tx - 6f * density).coerceAtLeast(20f * density)
             }
 
-            var formattedText = item.text
-            if (calloutTextPaint.measureText(formattedText) > maxTextWidth) {
-                val pctPart = item.text.substringAfterLast(':', "")
-                val namePart = item.text.substringBeforeLast(':', item.text)
-
-                var truncName = namePart
-                while (truncName.length > 2 && calloutTextPaint.measureText("$truncName…:$pctPart") > maxTextWidth) {
-                    truncName = truncName.dropLast(1)
+            val suffix = ": ${item.percentage}"
+            var truncatedCategory = item.category
+            if (calloutTextPaint.measureText("$truncatedCategory$suffix") > maxTextWidth) {
+                while (
+                    truncatedCategory.isNotEmpty() &&
+                    calloutTextPaint.measureText("$truncatedCategory…$suffix") > maxTextWidth
+                ) {
+                    truncatedCategory = truncatedCategory.dropLast(1)
                 }
-                formattedText = if (pctPart.isNotEmpty()) "$truncName…:$pctPart" else "$truncName…"
+            }
+            val formattedText = when {
+                truncatedCategory == item.category -> "$truncatedCategory$suffix"
+                truncatedCategory.isNotEmpty() -> "$truncatedCategory…$suffix"
+                else -> item.percentage
             }
 
             calloutTextPaint.color = item.textColor

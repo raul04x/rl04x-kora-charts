@@ -49,7 +49,7 @@ public fun KoraLineChart(
 ) {
     val renderer = remember { LineRenderer() }
     val progress = remember { Animatable(0f) }
-    var selectedPoint by remember { mutableStateOf<Entry?>(config.selectedEntry) }
+    var selectedPoint by remember { mutableStateOf(config.selectedEntry) }
     var zoomScaleX by remember { mutableFloatStateOf(config.zoomScaleX) }
     var panOffsetX by remember { mutableFloatStateOf(config.panOffsetX) }
     var zoomScaleY by remember { mutableFloatStateOf(config.zoomScaleY) }
@@ -230,7 +230,7 @@ public fun KoraBarChart(
 ) {
     val renderer = remember { BarRenderer() }
     val progress = remember { Animatable(0f) }
-    var selectedBar by remember { mutableStateOf<Entry?>(config.selectedEntry) }
+    var selectedBar by remember { mutableStateOf(config.selectedEntry) }
     var zoomScaleX by remember { mutableFloatStateOf(config.zoomScaleX) }
     var panOffsetX by remember { mutableFloatStateOf(config.panOffsetX) }
     var zoomScaleY by remember { mutableFloatStateOf(config.zoomScaleY) }
@@ -369,10 +369,11 @@ public fun KoraPieChart(
     config: ChartConfig = ChartConfig(),
     holeRadius: Float = 0.55f,
     onSliceSelected: ((entry: Entry) -> Unit)? = null,
+    onSliceSelectionChanged: ((entry: Entry?) -> Unit)? = null,
 ) {
     val renderer = remember(holeRadius) { PieRenderer(holeRadius) }
     val progress = remember { Animatable(0f) }
-    var selectedSlice by remember { mutableStateOf<Entry?>(config.selectedEntry) }
+    var selectedSlice by remember { mutableStateOf(config.selectedEntry) }
 
     LaunchedEffect(config.selectedEntry) {
         selectedSlice = config.selectedEntry
@@ -406,18 +407,33 @@ public fun KoraPieChart(
                 contentDescription = semanticsSummary
                 role = Role.Image
             }
-            .pointerInput(datasets, config, holeRadius, selectedSlice) {
+            .pointerInput(
+                datasets,
+                config,
+                holeRadius,
+                selectedSlice,
+                onSliceSelected,
+                onSliceSelectionChanged,
+            ) {
                 detectTapGestures { offset ->
                     val density = Resources.getSystem().displayMetrics.density
                     val padding = config.paddingDp * density
                     val engine = ChartEngine(size.width.toFloat(), size.height.toFloat(), padding)
                     val tappedSlice =
-                        engine.findPieEntryAt(offset.x, offset.y, datasets, density)
-                    if (selectedSlice != null && selectedSlice == tappedSlice) {
-                        selectedSlice = null
-                    } else {
-                        selectedSlice = tappedSlice
-                        tappedSlice?.let { onSliceSelected?.invoke(it) }
+                        engine.findPieEntryAt(
+                            screenX = offset.x,
+                            screenY = offset.y,
+                            datasets = datasets,
+                            density = density,
+                            config = activeConfig,
+                            holeRadiusRatio = holeRadius,
+                        )
+                    val newSelection =
+                        if (selectedSlice != null && selectedSlice == tappedSlice) null else tappedSlice
+                    if (newSelection != selectedSlice) {
+                        selectedSlice = newSelection
+                        onSliceSelectionChanged?.invoke(newSelection)
+                        newSelection?.let { onSliceSelected?.invoke(it) }
                     }
                 }
             },

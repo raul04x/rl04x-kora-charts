@@ -94,7 +94,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            app:kora_cardSubtitle="Global market share (%)"
+            app:kora_cardSubtitle="Global market share (%) · Tap a slice for details"
             app:kora_cardTitle="Web Browsers">
 
             <com.rl04x.koracharts.views.KoraPieChartView
@@ -112,7 +112,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
             app:kora_cardBadgeText="99% / 1%"
-            app:kora_cardSubtitle="Sueldo (€2,308 · 99%) vs Otros (€23 · 1%)"
+            app:kora_cardSubtitle="Sueldo (€2,308 · 99%) vs Otros (€23 · 1%) · Tap a slice for details"
             app:kora_cardTitle="Salary &amp; Income Distribution">
 
             <com.rl04x.koracharts.views.KoraPieChartView

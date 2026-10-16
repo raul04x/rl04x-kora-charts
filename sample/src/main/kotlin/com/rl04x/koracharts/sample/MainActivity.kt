@@ -2,6 +2,7 @@ package com.rl04x.koracharts.sample
 
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -53,9 +54,11 @@ import com.rl04x.koracharts.core.model.BubbleEntry
 import com.rl04x.koracharts.core.model.CandlestickEntry
 import com.rl04x.koracharts.core.model.ChartConfig
 import com.rl04x.koracharts.core.model.Dataset
+import com.rl04x.koracharts.core.model.Entry
 import com.rl04x.koracharts.core.model.KoraChartStyle
 import com.rl04x.koracharts.core.model.StackedBarEntry
 import com.rl04x.koracharts.sample.databinding.ActivityXmlViewsGalleryBinding
+import java.util.WeakHashMap
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -78,6 +81,8 @@ fun DashboardScreen() {
     var enableZoom by remember { mutableStateOf(true) }
     var useNiceTicks by remember { mutableStateOf(true) }
     var selectedHeightDp by remember { mutableIntStateOf(220) }
+    var selectedBrowserPieSlice by remember { mutableStateOf<Entry?>(null) }
+    var selectedIncomePieSlice by remember { mutableStateOf<Entry?>(null) }
 
     val chartStyle = remember(themeMode) {
         when (themeMode) {
@@ -123,6 +128,22 @@ fun DashboardScreen() {
             ),
         )
     }
+
+    val browserPieConfig = remember(chartConfig) {
+        chartConfig.copy(
+            centerTitle = "52%",
+            centerSubtitle = "Chrome",
+        )
+    }
+    val incomePieConfig = remember(chartConfig) {
+        chartConfig.copy(
+            valuePrefix = "€",
+            centerTitle = "Total",
+            showLegend = false,
+        )
+    }
+    val xmlChartConfigs = listOf(chartConfig, expensesConfig, browserPieConfig, incomePieConfig)
+    val appliedXmlChartConfigs = remember { WeakHashMap<View, List<ChartConfig>>() }
 
     val (expensesData, _) = remember { SampleData.generateMonthlyExpensesLineData() }
     val (revenueData, _) = remember { SampleData.generateRevenueThousandsLineData() }
@@ -418,18 +439,20 @@ fun DashboardScreen() {
                         val inflater = LayoutInflater.from(ctx)
                         val binding = ActivityXmlViewsGalleryBinding.inflate(inflater)
 
-                        binding.lineChartView.setData(expensesData, expensesConfig)
-                        binding.barChartView.setData(categoryData, chartConfig)
-                        binding.horizontalBarChartView.setData(latencyData, chartConfig)
-                        binding.pieChartView.setData(
-                            browserData,
-                            chartConfig.copy(centerTitle = "52%", centerSubtitle = "Chrome")
-                        )
-                        binding.incomePieChartView.setData(
-                            incomeData,
-                            chartConfig.copy(centerTitle = "52%", centerSubtitle = "Chrome")
-                        )
-                        binding.stackedBarChartView.setData(channelData, chartConfig)
+                        binding.pieChartView.onSliceSelectionChangedListener = { entry ->
+                            selectedBrowserPieSlice = entry
+                            binding.card4.setSubtitle(
+                                SampleData.pieSelectionSummary(entry, browserData)
+                                    ?: "Global market share (%) · Tap a slice for details"
+                            )
+                        }
+                        binding.incomePieChartView.onSliceSelectionChangedListener = { entry ->
+                            selectedIncomePieSlice = entry
+                            binding.card4b.setSubtitle(
+                                SampleData.pieSelectionSummary(entry, incomeData, "€")
+                                    ?: "Sueldo (€2,308 · 99%) vs Otros (€23 · 1%) · Tap a slice for details"
+                            )
+                        }
                         binding.stackedBarChartView.onBarSelectedListener = { entry ->
                             if (entry != null) {
                                 binding.card5.setBadge("Selected: ${entry.label}")
@@ -443,10 +466,6 @@ fun DashboardScreen() {
                                 binding.card5.setSubtitle("Accumulated breakdown (€)")
                             }
                         }
-                        binding.candlestickChartView.setData(cryptoData, chartConfig)
-                        binding.radarChartView.setData(devRadarData, chartConfig)
-                        binding.combinedChartView.setData(userTrafficData, chartConfig)
-                        binding.bubbleChartView.setData(riskData, chartConfig)
 
                         binding.root
                     },
@@ -487,19 +506,25 @@ fun DashboardScreen() {
                         binding.card8.applyStyle(chartStyle)
                         binding.card9.applyStyle(chartStyle)
 
-                        // Update data & configs
-                        binding.lineChartView.setData(expensesData, expensesConfig)
-                        binding.barChartView.setData(categoryData, chartConfig)
-                        binding.horizontalBarChartView.setData(latencyData, chartConfig)
-                        binding.pieChartView.setData(
-                            browserData,
-                            chartConfig.copy(centerTitle = "52%", centerSubtitle = "Chrome")
-                        )
-                        binding.stackedBarChartView.setData(channelData, chartConfig)
-                        binding.candlestickChartView.setData(cryptoData, chartConfig)
-                        binding.radarChartView.setData(devRadarData, chartConfig)
-                        binding.combinedChartView.setData(userTrafficData, chartConfig)
-                        binding.bubbleChartView.setData(riskData, chartConfig)
+                        if (appliedXmlChartConfigs[view] != xmlChartConfigs) {
+                            binding.lineChartView.setData(expensesData, expensesConfig)
+                            binding.barChartView.setData(categoryData, chartConfig)
+                            binding.horizontalBarChartView.setData(latencyData, chartConfig)
+                            binding.pieChartView.setData(
+                                browserData,
+                                browserPieConfig.copy(selectedEntry = selectedBrowserPieSlice),
+                            )
+                            binding.incomePieChartView.setData(
+                                incomeData,
+                                incomePieConfig.copy(selectedEntry = selectedIncomePieSlice),
+                            )
+                            binding.stackedBarChartView.setData(channelData, chartConfig)
+                            binding.candlestickChartView.setData(cryptoData, chartConfig)
+                            binding.radarChartView.setData(devRadarData, chartConfig)
+                            binding.combinedChartView.setData(userTrafficData, chartConfig)
+                            binding.bubbleChartView.setData(riskData, chartConfig)
+                            appliedXmlChartConfigs[view] = xmlChartConfigs
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -582,9 +607,12 @@ fun DashboardScreen() {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // 4. Donut/Pie Chart: Web Browsers
+                val browserPieSubtitle = selectedBrowserPieSlice?.let {
+                    SampleData.pieSelectionSummary(it, browserData)
+                } ?: "Global market share (%) · Tap a slice for details"
                 KoraChartCard(
                     title = "Web Browsers",
-                    subtitle = "Global market share (%)",
+                    subtitle = browserPieSubtitle,
                     chartHeight = selectedHeightDp.dp,
                     style = chartStyle,
                     modifier = Modifier.fillMaxWidth(),
@@ -594,19 +622,23 @@ fun DashboardScreen() {
                         config = chartConfig.copy(
                             centerTitle = "52%",
                             centerSubtitle = "Chrome",
-                            showLegend = false
+                            showLegend = false,
+                            selectedEntry = selectedBrowserPieSlice,
                         ),
                         modifier = Modifier.fillMaxSize(),
+                        onSliceSelectionChanged = { selectedBrowserPieSlice = it },
                     )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // 4b. Income Distribution Asymmetric Donut Chart (99% vs 1%)
-                val incomeData = remember { SampleData.generateIncomeDistributionDonutData() }
+                val incomePieSubtitle = selectedIncomePieSlice?.let {
+                    SampleData.pieSelectionSummary(it, incomeData, "€")
+                } ?: "Sueldo (€2,308 · 99%) vs Otros (€23 · 1%) · Tap a slice for details"
                 KoraChartCard(
                     title = "Salary & Income Distribution",
-                    subtitle = "Sueldo (€2,308 · 99%) vs Otros (€23 · 1%)",
+                    subtitle = incomePieSubtitle,
                     badgeText = "99% / 1%",
                     chartHeight = selectedHeightDp.dp,
                     style = chartStyle,
@@ -618,9 +650,11 @@ fun DashboardScreen() {
                             valuePrefix = "€",
                             centerTitle = "Total",
                             showLegend = false,
+                            selectedEntry = selectedIncomePieSlice,
                         ),
                         holeRadius = 0.58f,
                         modifier = Modifier.fillMaxSize(),
+                        onSliceSelectionChanged = { selectedIncomePieSlice = it },
                     )
                 }
 

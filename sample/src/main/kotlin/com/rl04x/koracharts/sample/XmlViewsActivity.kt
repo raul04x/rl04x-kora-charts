@@ -50,12 +50,24 @@ class XmlViewsActivity : AppCompatActivity() {
         }
 
         binding.pieChartView.setData(browserData)
+        binding.pieChartView.onSliceSelectionChangedListener = { entry ->
+            binding.card4.setSubtitle(
+                SampleData.pieSelectionSummary(entry, browserData)
+                    ?: "Global market share (%) · Tap a slice for details"
+            )
+        }
         val incomeConfig = ChartConfig(
             valuePrefix = "€",
             centerTitle = "Total",
             showLegend = false,
         )
         binding.incomePieChartView.setData(incomeData, incomeConfig)
+        binding.incomePieChartView.onSliceSelectionChangedListener = { entry ->
+            binding.card4b.setSubtitle(
+                SampleData.pieSelectionSummary(entry, incomeData, "€")
+                    ?: "Sueldo (€2,308 · 99%) vs Otros (€23 · 1%) · Tap a slice for details"
+            )
+        }
 
         binding.stackedBarChartView.setData(channelData)
         binding.stackedBarChartView.onBarSelectedListener = { entry ->

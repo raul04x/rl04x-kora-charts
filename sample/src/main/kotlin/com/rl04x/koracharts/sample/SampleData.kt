@@ -8,6 +8,8 @@ import com.rl04x.koracharts.core.model.Dataset
 import com.rl04x.koracharts.core.model.Entry
 import com.rl04x.koracharts.core.model.RadarDataSet
 import com.rl04x.koracharts.core.model.StackedBarEntry
+import java.text.NumberFormat
+import java.util.Locale
 import kotlin.math.pow
 
 object SampleData {
@@ -149,6 +151,25 @@ object SampleData {
     }
 
     fun generateBrowserSharePieData(): List<Dataset> = generateMarketSharePieData()
+
+    fun pieSelectionSummary(
+        entry: Entry?,
+        datasets: List<Dataset>,
+        valuePrefix: String = "",
+    ): String? {
+        entry ?: return null
+        val entries = datasets.firstOrNull()?.entries.orEmpty()
+        val total = entries.sumOf { it.y.toDouble() }
+        if (total <= 0.0) return null
+
+        val numberFormat = NumberFormat.getInstance(Locale.getDefault()).apply {
+            maximumFractionDigits = 0
+        }
+        val category = entry.label?.substringBefore('\n') ?: "Item"
+        val value = numberFormat.format(entry.y.toDouble())
+        val percentage = numberFormat.format(entry.y / total * 100.0)
+        return "$category: $valuePrefix$value ($percentage%)"
+    }
 
     // 4b. Donut Data: Extreme Asymmetric Donut (Sueldo 99% vs Otros 1%)
     fun generateIncomeDistributionDonutData(): List<Dataset> {

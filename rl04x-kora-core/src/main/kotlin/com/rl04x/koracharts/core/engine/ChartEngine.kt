@@ -3,9 +3,11 @@ package com.rl04x.koracharts.core.engine
 import com.rl04x.koracharts.core.model.ChartConfig
 import com.rl04x.koracharts.core.model.Dataset
 import com.rl04x.koracharts.core.model.Entry
+import com.rl04x.koracharts.core.renderer.helper.LegendRenderer
 import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.max
-import kotlin.math.sqrt
+import kotlin.math.sin
 
 /**
  * Transforms data values into screen pixel coordinates supporting 2D Zoom & Pan.
@@ -159,9 +161,7 @@ public class ChartEngine(
         if (entryCount == 0) return null
 
         val range = computeRange(visibleDatasets)
-        val minX = 0f
         val maxX = maxOf(1f, range.maxX)
-        val rangeX = maxX
 
         val hasSecondaryY = config.showSecondaryYAxis || datasets.any { it.useSecondaryAxis }
         val hasLegend = config.showLegend && datasets.any { it.label.isNotEmpty() }
@@ -184,7 +184,7 @@ public class ChartEngine(
 
         val legendLabels = if (hasLegend) datasets.filter { it.visible && it.label.isNotEmpty() }
             .map { it.label } else emptyList()
-        val legendRenderer = com.rl04x.koracharts.core.renderer.helper.LegendRenderer()
+        val legendRenderer = LegendRenderer()
         val legendHeight = if (hasLegend) legendRenderer.calculateLegendHeight(
             legendLabels,
             viewWidth - leftPadding - rightPadding,
@@ -201,15 +201,15 @@ public class ChartEngine(
         val clampedPanPixels = config.panOffsetX.coerceIn(0f, maxPanPixels)
 
         val visibleZoomY = maxOf(1f, config.zoomScaleY)
-        val visibleRangeY = if (visibleZoomY == 1f) maxOf(1f, range.maxY) else maxOf(1f, range.maxY) / visibleZoomY
+        val visibleRangeY =
+            if (visibleZoomY == 1f) maxOf(1f, range.maxY) else maxOf(1f, range.maxY) / visibleZoomY
         val maxPanY = (range.maxY - visibleRangeY).coerceAtLeast(0f)
         val clampedPanY = config.panOffsetY.coerceIn(0f, maxPanY)
-        val visibleMinY = clampedPanY
-        val visibleMaxY = visibleMinY + visibleRangeY
+        val visibleMaxY = clampedPanY + visibleRangeY
 
         val tickResult = if (config.useNiceTicks) {
             AxisTickCalculator.computeNiceTicks(
-                min = visibleMinY,
+                min = clampedPanY,
                 max = visibleMaxY,
                 targetTicks = 4,
                 customStep = config.yAxisStep,
@@ -228,7 +228,7 @@ public class ChartEngine(
         for ((entries) in visibleDatasets) {
             for (idx in entries.indices) {
                 val entry = entries[idx]
-                val pctX = entry.x / rangeX
+                val pctX = entry.x / maxX
 
                 val ex = leftPadding + (pctX * drawWidth * effectiveZoomX) - clampedPanPixels
                 val pctY = entry.y / effectiveRangeY
@@ -253,39 +253,70 @@ public class ChartEngine(
         screenY: Float,
         datasets: List<Dataset>,
         density: Float = 1f,
+        config: ChartConfig = ChartConfig(),
+        holeRadiusRatio: Float = 0.55f,
     ): Entry? {
         val entries = datasets.firstOrNull()?.entries ?: return null
         val total = entries.sumOf { it.y.toDouble() }.toFloat()
         if (total <= 0f) return null
 
-        val padding = paddingPx
-        val outerMargin = 12f * density
-        val availableSize = minOf(viewWidth, viewHeight) - (padding * 2f) - (outerMargin * 2f)
-        val size = maxOf(availableSize, 40f * density)
-
-        val radius = size / 2f
-        val centerX = viewWidth / 2f
-        val centerY = viewHeight / 2f
-
-        val dx = screenX - centerX
-        val dy = screenY - centerY
-        val dist = sqrt((dx * dx + dy * dy).toDouble()).toFloat()
-
-        if (dist > radius + 40f * density) return null
-
-        var angleDeg = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
-        if (angleDeg < -90f) {
-            angleDeg += 360f
+        val hasLegend = config.showLegend && entries.isNotEmpty()
+        val legendHeight = if (hasLegend) {
+            val labels = entries.mapIndexed { index, entry ->
+                entry.label?.substringBefore('\n') ?: "Category ${index + 1}"
+            }
+            LegendRenderer().calculateLegendHeight(
+                labels = labels,
+                maxLegendWidth = viewWidth - paddingPx * 2f,
+                density = density,
+            )
+        } else {
+            0f
         }
+        val layout = PieChartLayout.calculate(
+            width = viewWidth,
+            height = viewHeight,
+            paddingPx = paddingPx,
+            density = density,
+            entryCount = entries.size,
+            config = config,
+            legendHeight = legendHeight,
+        )
+        val holeRadius = if (holeRadiusRatio > 0f) layout.radius * holeRadiusRatio else 0f
 
         var startAngle = -90f
         for (entry in entries) {
-            val sweepAngle = (entry.y / total) * 360f
-            val endAngle = startAngle + sweepAngle
-            if (angleDeg in startAngle..endAngle) {
-                return entry
+            val rawSweepAngle = (entry.y / total) * 360f
+            val sweepAngle = if (rawSweepAngle in 0.001f..2.999f) 3f else rawSweepAngle
+            if (sweepAngle <= 0f) {
+                startAngle += rawSweepAngle
+                continue
             }
-            startAngle = endAngle
+
+            val midAngleRad = Math.toRadians((startAngle + sweepAngle / 2f).toDouble())
+            val explosionDist = if (entry == config.selectedEntry) 5f * density else 0f
+            val sliceCenterX =
+                layout.centerX + (explosionDist * cos(midAngleRad)).toFloat()
+            val sliceCenterY =
+                layout.centerY + (explosionDist * sin(midAngleRad)).toFloat()
+            val dx = screenX - sliceCenterX
+            val dy = screenY - sliceCenterY
+            val distanceSquared = dx * dx + dy * dy
+            val centerDx = screenX - layout.centerX
+            val centerDy = screenY - layout.centerY
+            val centerDistanceSquared = centerDx * centerDx + centerDy * centerDy
+
+            if (
+                distanceSquared <= layout.radius * layout.radius &&
+                distanceSquared >= holeRadius * holeRadius &&
+                centerDistanceSquared >= holeRadius * holeRadius
+            ) {
+                var angleDeg = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
+                if (angleDeg < -90f) angleDeg += 360f
+                if (angleDeg in startAngle..(startAngle + sweepAngle)) return entry
+            }
+
+            startAngle += rawSweepAngle
         }
 
         return null

@@ -31,6 +31,8 @@ public class KoraPieChartView @JvmOverloads constructor(
 
     public var onSliceSelectedListener: ((entry: Entry) -> Unit)? = null
 
+    public var onSliceSelectionChangedListener: ((entry: Entry?) -> Unit)? = null
+
     init {
         if (attrs != null) {
             val a =
@@ -85,20 +87,30 @@ public class KoraPieChartView @JvmOverloads constructor(
             val density = resources.displayMetrics.density
             val padding = config.paddingDp * density
             val engine = ChartEngine(width.toFloat(), height.toFloat(), padding)
-            val tappedSlice = engine.findPieEntryAt(event.x, event.y, datasets, density)
+            val tappedSlice = engine.findPieEntryAt(
+                screenX = event.x,
+                screenY = event.y,
+                datasets = datasets,
+                density = density,
+                config = config,
+                holeRadiusRatio = holeRadius,
+            )
 
             if (tappedSlice != null) {
                 if (config.selectedEntry == tappedSlice) {
                     config = config.copy(selectedEntry = null)
+                    onSliceSelectionChangedListener?.invoke(null)
                 } else {
                     config = config.copy(selectedEntry = tappedSlice)
                     onSliceSelectedListener?.invoke(tappedSlice)
+                    onSliceSelectionChangedListener?.invoke(tappedSlice)
                 }
                 performClick()
                 invalidate()
             } else {
                 if (config.selectedEntry != null) {
                     config = config.copy(selectedEntry = null)
+                    onSliceSelectionChangedListener?.invoke(null)
                     performClick()
                     invalidate()
                 }
