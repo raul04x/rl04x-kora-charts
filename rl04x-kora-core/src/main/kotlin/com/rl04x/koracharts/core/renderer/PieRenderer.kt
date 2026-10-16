@@ -11,13 +11,15 @@ import com.rl04x.koracharts.core.model.ChartConfig
 import com.rl04x.koracharts.core.model.Dataset
 import com.rl04x.koracharts.core.renderer.helper.GlassTooltipRenderer
 import com.rl04x.koracharts.core.renderer.helper.LegendRenderer
+import com.rl04x.koracharts.core.util.NumberFormatterUtils
+import java.text.NumberFormat
 import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.sin
 
 /**
  * Renderer for Pie and Donut charts with EVEN_ODD ring geometry, 360deg full circle safety,
- * minimum slice angle safety, legend bar support, smart bounds callout text truncation,
+ * system locale currency/number formatting, legend bar support, smart bounds callout text truncation,
  * glass tooltip badges, perfect inner hole circularity, and zero-allocation draw loops.
  */
 public class PieRenderer(
@@ -226,16 +228,18 @@ public class PieRenderer(
                 selectedBadgeY = (centerY + shiftY + badgeRadius * sin(midAngleRad)).toFloat()
                 val pct = (entry.y / total) * 100f
                 val baseLabel = entry.label ?: "Item"
+                val formattedVal = formatValue(entry.y, config)
                 selectedBadgeText = if (baseLabel.contains("\n")) {
                     baseLabel
                 } else {
-                    "$baseLabel: ${String.format(Locale.US, "%.0f%%", pct)}"
+                    "$baseLabel: $formattedVal (${formatPercentage(pct)})"
                 }
             }
 
             if (config.showAxisLabels && progress >= 0.8f && !isSelected) {
                 val pct = (entry.y / total) * 100f
-                val pctText = String.format(Locale.US, "%.0f%%", pct)
+                val pctText = formatPercentage(pct)
+                val formattedVal = formatValue(entry.y, config)
 
                 if (sweepAngle > 18f) {
                     val midRadius =
@@ -245,7 +249,7 @@ public class PieRenderer(
                         (centerY + shiftY + midRadius * sin(midAngleRad)).toFloat() + 4f * density
 
                     val calculatedContrastColor =
-                        com.rl04x.koracharts.core.util.NumberFormatterUtils.calculateHarmoniousContrastColor(
+                        NumberFormatterUtils.calculateHarmoniousContrastColor(
                             sliceColor
                         )
 
@@ -262,7 +266,8 @@ public class PieRenderer(
                     val isRightSide = cos(midAngleRad) >= 0
                     val textColor = entry.textColor ?: config.style.labelTextColor
                     val displayText =
-                        entry.label?.substringBefore('\n')?.let { "$it: $pctText" } ?: pctText
+                        entry.label?.substringBefore('\n')?.let { "$it: $formattedVal ($pctText)" }
+                            ?: "$formattedVal ($pctText)"
 
                     if (isRightSide) {
                         if (rightCalloutCount < rightCallouts.size) {
@@ -329,9 +334,10 @@ public class PieRenderer(
 
             val subtitleText = if (selected != null) {
                 val pct = (selected.y / total) * 100f
-                String.format(Locale.US, "%.1f (%.0f%%)", selected.y, pct)
+                val formattedVal = formatValue(selected.y, config)
+                "$formattedVal (${formatPercentage(pct)})"
             } else {
-                config.centerSubtitle ?: String.format(Locale.US, "%.0f", total)
+                config.centerSubtitle ?: formatValue(total, config)
             }
 
             var titleSize = 16f * density
@@ -375,6 +381,30 @@ public class PieRenderer(
                 isSelected = true,
             )
         }
+    }
+
+    private fun formatValue(value: Float, config: ChartConfig): String {
+        config.yAxisFormatter?.let { return it.invoke(value) }
+        if (config.compactNumberFormatting) {
+            return NumberFormatterUtils.formatCompact(
+                value,
+                config.valuePrefix,
+                config.valueSuffix
+            )
+        }
+        val numberFormat = NumberFormat.getInstance(Locale.getDefault()).apply {
+            maximumFractionDigits = if (config.forceIntegerTicks) 0 else 1
+            minimumFractionDigits = 0
+        }
+        val numStr = numberFormat.format(value.toDouble())
+        return "${config.valuePrefix}$numStr${config.valueSuffix}"
+    }
+
+    private fun formatPercentage(pct: Float): String {
+        val numberFormat = NumberFormat.getInstance(Locale.getDefault()).apply {
+            maximumFractionDigits = 0
+        }
+        return "${numberFormat.format(pct.toDouble())}%"
     }
 
     private fun drawCallouts(

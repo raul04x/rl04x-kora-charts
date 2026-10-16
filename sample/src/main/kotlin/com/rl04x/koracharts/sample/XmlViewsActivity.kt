@@ -2,6 +2,7 @@ package com.rl04x.koracharts.sample
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import com.rl04x.koracharts.core.model.ChartConfig
 import com.rl04x.koracharts.sample.databinding.ActivityXmlViewsGalleryBinding
 
 /**
@@ -49,7 +50,12 @@ class XmlViewsActivity : AppCompatActivity() {
         }
 
         binding.pieChartView.setData(browserData)
-        binding.incomePieChartView.setData(incomeData)
+        val incomeConfig = ChartConfig(
+            valuePrefix = "€",
+            centerTitle = "Total",
+            showLegend = false,
+        )
+        binding.incomePieChartView.setData(incomeData, incomeConfig)
 
         binding.stackedBarChartView.setData(channelData)
         binding.stackedBarChartView.onBarSelectedListener = { entry ->

@@ -15,8 +15,9 @@
 - **⚡ Zero-Allocation Canvas Engine:**
   - Re-architected modular sub-renderers (`AxisGridRenderer`, `LegendRenderer`, `GlassTooltipRenderer`) with pre-allocated buffer recycling for zero Garbage Collection (GC) pressure at 60/120 FPS.
 
-- **🍩 EVEN_ODD Donut Geometry & Smart Bounds Callout Truncation:**
+- **🍩 EVEN_ODD Donut Geometry & System Locale Currency Formatting:**
   - Closed path ring rendering with `FillType.EVEN_ODD` for 100% Skia GPU compatibility and $360^\circ$ full circle / single-entry safety.
+  - Automatic system locale number formatting (`Locale.getDefault()`) supporting currency prefixes (`$`, `€`, `£`, `MXN $`) and suffixes.
   - Automatic callout text truncation with ellipsis (`"Odontolo…: 4%"`) preserving percentage visibility without edge clipping.
 
 - **🪟 Translucent Glass Tooltips:**
@@ -26,7 +27,7 @@
 - **📊 9 Chart Types Supported:**
   1. **Line Chart** (`KoraLineChart`) — Smooth bezier curves with gradient fills, node points, and crosshair highlight lines.
   2. **Bar Chart** (`KoraBarChart`) — Vertical rounded bars with $Y = 0$ flat-anchored baselines, top-only rounded corners, individual per-entry colors, and highlight borders.
-  3. **Horizontal Bar Chart** (`KoraHorizontalBarChart`) — Horizontal progress bars with track backgrounds and value labels.
+  3. **Horizontal Bar Chart** (`KoraHorizontalBarChart`) — Horizontal progress bars with track backgrounds, value labels, and touch selection.
   4. **Donut & Pie Chart** (`KoraPieChart`) — Donut chart with true ring rendering, Google WCAG contrast text, auto-scaling center hole text, and smart bounds callouts.
   5. **Stacked Bar Chart** (`KoraStackedBarChart`) — Multi-segment stacked bars supporting 480+ entries (e.g. credit loan schedules), top-only rounded corners, multi-row legend wrapping, and segment breakdown cards.
   6. **Candlestick Chart** (`KoraCandlestickChart`) — Financial candlestick chart with high/low wicks, bullish/bearish candle bodies, and 2D Zoom/Pan.
@@ -94,13 +95,13 @@ dependencyResolutionManagement {
 ```kotlin
 dependencies {
     // For Jetpack Compose components
-    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-compose:1.0.0-beta04")
+    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-compose:1.0.0")
 
     // Core charting engine
-    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-core:1.0.0-beta04")
+    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-core:1.0.0")
 
     // For Android Views XML support (optional)
-    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-views:1.0.0-beta04")
+    implementation("com.github.raul04x.rl04x-kora-charts:rl04x-kora-views:1.0.0")
 }
 ```
 
@@ -166,26 +167,27 @@ KoraChartCard(
 }
 ```
 
-### 2. Donut Chart with Custom Entry Colors & Automatic Contrast
+### 2. Donut Chart with Currency Formatting & Automatic Contrast
 
 ```kotlin
 val pieDataset = Dataset(
     entries = listOf(
-        Entry(1f, 52f, "Chrome", color = "#F59E0B".toColorInt()), // Yellow background -> auto dark text
-        Entry(2f, 24f, "Safari", color = "#3B82F6".toColorInt(), textColor = Color.WHITE),
-        Entry(3f, 14f, "Firefox", color = "#8B5CF6".toColorInt()),
-        Entry(4f, 10f, "Edge", color = "#F87171".toColorInt())
+        Entry(0f, 2308f, "Sueldo", color = "#10B981".toColorInt()),
+        Entry(1f, 23.3f, "Otros", color = "#F87171".toColorInt())
     )
+)
+
+val config = ChartConfig(
+    style = KoraChartStyle.oledDark(),
+    valuePrefix = "€",
+    centerTitle = "Total",
+    showLegend = false
 )
 
 KoraPieChart(
     datasets = listOf(pieDataset),
-    config = ChartConfig(
-        style = KoraChartStyle.oledDark(),
-        centerTitle = "Total",
-        centerSubtitle = "1,146.78"
-    ),
-    holeRadius = 0.55f,
+    config = config,
+    holeRadius = 0.58f,
     modifier = Modifier.height(240.dp)
 )
 ```

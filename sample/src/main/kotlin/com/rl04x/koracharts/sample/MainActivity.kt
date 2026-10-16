@@ -615,9 +615,9 @@ fun DashboardScreen() {
                     KoraPieChart(
                         datasets = incomeData,
                         config = chartConfig.copy(
+                            valuePrefix = "€",
                             centerTitle = "Total",
-                            centerSubtitle = "€2,331",
-                            showLegend = false
+                            showLegend = false,
                         ),
                         holeRadius = 0.58f,
                         modifier = Modifier.fillMaxSize(),
